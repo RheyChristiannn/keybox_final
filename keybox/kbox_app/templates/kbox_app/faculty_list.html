@@ -1,0 +1,315 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Management</title>
+  <link rel="stylesheet" href="{% static 'kbox_app/css/style.css' %}">
+  <style>
+    .management-header {
+      background: linear-gradient(135deg, #388e3c 0%, #2e7d32 100%);
+      color: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 15px rgba(3, 87, 8, 0.04);
+    }
+    .management-header h1 { margin: 0 0 10px 0; font-size: 28px; }
+    .management-header p { margin: 0; opacity: 0.9; }
+    
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      padding: 20px;
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(255, 0, 0, 0.05);
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    
+    .search-filter {
+      display: flex;
+      gap: 10px;
+      flex: 1;
+      max-width: 600px;
+    }
+    .search-filter input {
+      flex: 1;
+      padding: 10px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .search-filter button {
+      padding: 10px 20px;
+      background: #388e3c;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .search-filter button:hover {
+      background: #2e7d32;
+    }
+    
+    .stats-box {
+      display: flex;
+      gap: 15px;
+    }
+    .stat-item {
+      padding: 10px 20px;
+      background: #09630aff;
+      border-radius: 8px;
+      font-size: 13px;
+      text-align: center;
+    }
+    .stat-item strong { 
+      display: block;
+      color: #36e93fff; 
+      font-size: 20px;
+      margin-bottom: 5px;
+    }
+    
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: #388e3c;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #388e3c;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(4, 240, 16, 0.3);
+    }
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #0a0a0aff;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+    .btn-secondary:hover {
+      background: #e0e0e0ff;
+    }
+    .btn-danger {
+      background: #d32f2f;
+      color: white;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+    .btn-danger:hover {
+      background: #b71c1c;
+    }
+    .btn-success {
+      background: #43a047;
+      color: white;
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+    
+    .table-container {
+      background: #206719ff;
+      color: #fdfafaff;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(18, 244, 52, 0);
+      overflow: hidden;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    thead {
+      background: #388e3c;
+      color: white;
+    }
+    thead th {
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+    }
+    tbody td {
+      padding: 15px;
+      border-bottom: 1px solid #080808ff;
+    }
+    tbody tr:hover {
+      color: #282525ff;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-active {
+      background: #e8f5e9;
+      color: #1e8223ff;
+    }
+    .status-inactive {
+      background: #ffebee;
+      color: #c62828;
+    }
+    
+    .count-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      background: #e3f2fd;
+      color: #010204ff;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #388e3c;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    
+    .messages {
+      margin-bottom: 20px;
+    }
+    .alert {
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    .alert-success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-left: 4px solid #388e3c;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="{% url 'dashboard' %}" class="back-link">← Back to Dashboard</a>
+    
+    {% if messages %}
+      <div class="messages">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    
+    <div class="management-header">
+      <h1>Faculty Management</h1>
+    </div>
+    
+    <div class="action-bar" style="flex-direction: column; align-items: stretch;">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <div class="search-filter">
+          <form method="get" style="display: flex; gap: 10px; flex: 1;">
+            <input type="text" name="search" placeholder="Search by name or school ID..." 
+                   value="{{ search_query }}">
+            <button type="submit">Search</button>
+          </form>
+        </div>
+        <a href="{% url 'faculty_add' %}" class="btn btn-primary">+ Add New Faculty</a>
+      </div>
+      
+      <div class="stats-box" style="margin-top: 15px;">
+        <div class="stat-item">
+          <strong>{{ active_count }}</strong>
+          Active
+        </div>
+        <div class="stat-item">
+          <strong>{{ inactive_count }}</strong>
+          Inactive
+        </div>
+        <div class="stat-item">
+          <strong>{{ faculty_list.count }}</strong>
+          Total Faculty
+        </div>
+      </div>
+    </div>
+    
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Faculty Name</th>
+            <th>School ID</th>
+            <th>Department</th>
+            <th>RFID Cards</th>
+            <th>Schedules</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for faculty in faculty_list %}
+            <tr>
+              <td><strong>{{ faculty.full_name }}</strong></td>
+              <td>{{ faculty.school_id }}</td>
+              <td>{{ faculty.get_department_display }}</td>
+              <td>
+                <span class="count-badge">
+                  🔑 {{ faculty.rfid_count }} card{{ faculty.rfid_count|pluralize }}
+                </span>
+              </td>
+              <td>
+                <span class="count-badge">
+                  📅 {{ faculty.schedule_count }} schedule{{ faculty.schedule_count|pluralize }}
+                </span>
+              </td>
+              <td>
+                {% if faculty.is_active %}
+                  <span class="status-badge status-active">Active</span>
+                {% else %}
+                  <span class="status-badge status-inactive">Inactive</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="action-buttons">
+                  <a href="{% url 'faculty_edit' faculty.id %}" class="btn btn-secondary">Edit</a>
+                  <a href="{% url 'faculty_toggle_status' faculty.id %}" 
+                     class="btn {% if faculty.is_active %}btn-danger{% else %}btn-success{% endif %}"
+                     onclick="return confirm('Are you sure?')">
+                    {% if faculty.is_active %}Disable{% else %}Enable{% endif %}
+                  </a>
+                  <a href="{% url 'faculty_manage_access' faculty.id %}" class="btn btn-primary">Manage Access</a>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 40px; color: #999;">
+                No faculty members found. Click "Add New Faculty" to get started.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

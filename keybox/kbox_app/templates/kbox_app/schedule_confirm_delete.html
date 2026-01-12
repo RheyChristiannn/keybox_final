@@ -1,0 +1,105 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delete Schedule</title>
+  <link rel="stylesheet" href="{% static 'kbox_app/css/style.css' %}">
+  <style>
+    .confirm-container {
+      max-width: 500px;
+      margin: 100px auto;
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .warning-icon {
+      font-size: 60px;
+      margin-bottom: 20px;
+    }
+    h1 {
+      color: #d32f2f;
+      margin-bottom: 20px;
+      font-size: 24px;
+    }
+    .schedule-info {
+      background: #f5f5f5;
+      padding: 20px;
+      border-radius: 8px;
+      margin: 20px 0;
+      text-align: left;
+    }
+    .schedule-info p {
+      margin: 10px 0;
+      font-size: 14px;
+    }
+    .schedule-info strong {
+      color: #388e3c;
+    }
+    .warning-text {
+      color: #666;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+    .button-group {
+      display: flex;
+      gap: 15px;
+      margin-top: 30px;
+    }
+    .btn {
+      flex: 1;
+      padding: 14px 32px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.3s;
+    }
+    .btn-danger {
+      background: #d32f2f;
+      color: white;
+    }
+    .btn-danger:hover {
+      background: #b71c1c;
+    }
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #666;
+    }
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="confirm-container">
+      <div class="warning-icon">⚠️</div>
+      <h1>Delete Schedule?</h1>
+      <p class="warning-text">Are you sure you want to delete this schedule? This action cannot be undone.</p>
+      
+      <div class="schedule-info">
+        <p><strong>Room:</strong> {{ schedule.room.code }}</p>
+        <p><strong>Day:</strong> {{ schedule.get_day_of_week_display }}</p>
+        <p><strong>Time:</strong> {{ schedule.start_time|time:"h:i A" }} - {{ schedule.end_time|time:"h:i A" }}</p>
+        <p><strong>Subject:</strong> {{ schedule.subject|default:"N/A" }}</p>
+        <p><strong>Instructor:</strong> {{ schedule.instructor_name|default:"N/A" }}</p>
+      </div>
+      
+      <form method="post">
+        {% csrf_token %}
+        <div class="button-group">
+          <a href="{% url 'schedule_list' %}" class="btn btn-secondary">Cancel</a>
+          <button type="submit" class="btn btn-danger">Yes, Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

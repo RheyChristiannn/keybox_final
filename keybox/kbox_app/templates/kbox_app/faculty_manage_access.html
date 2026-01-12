@@ -1,0 +1,340 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Faculty Access - {{ faculty.full_name }}</title>
+  <link rel="stylesheet" href="{% static 'kbox_app/css/style.css' %}">
+  <style>
+    .faculty-header {
+      background: linear-gradient(135deg, #388e3c 0%, #2e7d32 100%);
+      color: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .faculty-header h1 { margin: 0 0 10px 0; font-size: 28px; }
+    .faculty-header p { margin: 0; opacity: 0.9; }
+    
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+    .info-card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .info-card h3 {
+      margin: 0 0 10px 0;
+      color: #388e3c;
+      font-size: 14px;
+      text-transform: uppercase;
+    }
+    .info-card p {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .section-box {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin-bottom: 25px;
+    }
+    .section-box h2 {
+      margin: 0 0 20px 0;
+      color: #388e3c;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .rfid-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .rfid-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      transition: all 0.2s;
+    }
+    .rfid-item:hover {
+      border-color: #388e3c;
+      background: #f1f8f4;
+    }
+    .rfid-info {
+      flex: 1;
+    }
+    .rfid-code {
+      font-family: monospace;
+      font-size: 16px;
+      font-weight: 600;
+      color: #1565c0;
+    }
+    .rfid-room {
+      font-size: 14px;
+      color: #666;
+      margin-top: 5px;
+    }
+    
+    .add-rfid-form {
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 8px;
+      border: 2px dashed #ddd;
+    }
+    .add-rfid-form h3 {
+      margin: 0 0 15px 0;
+      color: #388e3c;
+      font-size: 16px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto;
+      gap: 10px;
+      align-items: end;
+    }
+    .form-group {
+      margin-bottom: 0;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #333;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #388e3c;
+    }
+    
+    .schedule-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .schedule-item {
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    .schedule-item strong {
+      color: #388e3c;
+    }
+    
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.3s;
+      font-size: 14px;
+    }
+    .btn-primary {
+      background: #388e3c;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #2e7d32;
+    }
+    .btn-danger {
+      background: #d32f2f;
+      color: white;
+      padding: 8px 16px;
+      font-size: 12px;
+    }
+    .btn-danger:hover {
+      background: #b71c1c;
+    }
+    
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #388e3c;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
+      font-size: 14px;
+    }
+    
+    .messages {
+      margin-bottom: 20px;
+    }
+    .alert {
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+    .alert-success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-left: 4px solid #388e3c;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="{% url 'faculty_list' %}" class="back-link">← Back to Faculty List</a>
+    
+    {% if messages %}
+      <div class="messages">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    
+    <div class="faculty-header">
+      <h1>{{ faculty.full_name }}</h1>
+      <p>{{ faculty.get_department_display }} • {{ faculty.school_id }}</p>
+    </div>
+    
+    <div class="info-grid">
+      <div class="info-card">
+        <h3>🔑 RFID Cards</h3>
+        <p>{{ rfid_cards.count }}</p>
+      </div>
+      <div class="info-card">
+        <h3>📅 Schedules</h3>
+        <p>{{ schedules.count }}</p>
+      </div>
+      <div class="info-card">
+        <h3>🏢 Accessible Rooms</h3>
+        <p>{{ rfid_cards|length }}</p>
+      </div>
+    </div>
+    
+    <!-- RFID Cards Section -->
+    <div class="section-box">
+      <h2>🔑 RFID Cards</h2>
+      
+      {% if rfid_cards %}
+        <ul class="rfid-list">
+          {% for rfid in rfid_cards %}
+            <li class="rfid-item">
+              <div class="rfid-info">
+                <div class="rfid-code">🔐 {{ rfid.rfid_code }}</div>
+                <div class="rfid-room">🏢 Room {{ rfid.room.code }}</div>
+              </div>
+              <form method="post" style="margin: 0;">
+                {% csrf_token %}
+                <input type="hidden" name="remove_rfid" value="1">
+                <input type="hidden" name="rfid_id" value="{{ rfid.id }}">
+                <button type="submit" class="btn btn-danger" 
+                        onclick="return confirm('Remove this RFID card?')">
+                  Remove
+                </button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state">
+          No RFID cards assigned yet. Add one below.
+        </div>
+      {% endif %}
+      
+      <!-- Add New RFID Form -->
+      <div class="add-rfid-form" style="margin-top: 20px;">
+        <h3>➕ Add New RFID Card</h3>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="add_rfid" value="1">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="rfid_code">RFID Code</label>
+              <input type="text" name="rfid_code" id="rfid_code" 
+                     placeholder="Scan or enter RFID code" required>
+            </div>
+            <div class="form-group">
+              <label for="room_id">Room</label>
+              <select name="room_id" id="room_id" required>
+                <option value="">Select Room</option>
+                {% for room in available_rooms %}
+                  <option value="{{ room.id }}">Room {{ room.code }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label style="visibility: hidden;">Action</label>
+              <button type="submit" class="btn btn-primary">Add Card</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    
+    <!-- Schedules Section -->
+    <div class="section-box">
+      <h2>📅 Assigned Schedules</h2>
+      
+      {% if schedules %}
+        <ul class="schedule-list">
+          {% for schedule in schedules %}
+            <li class="schedule-item">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <strong>Room {{ schedule.room.code }}</strong> • 
+                  {{ schedule.get_day_of_week_display }}<br>
+                  <span style="color: #666;">
+                    {{ schedule.start_time|time:"h:i A" }} - {{ schedule.end_time|time:"h:i A" }}
+                  </span>
+                  {% if schedule.subject %}
+                    <br><span style="font-size: 14px; color: #999;">📚 {{ schedule.subject }}</span>
+                  {% endif %}
+                </div>
+                <a href="{% url 'schedule_edit' schedule.id %}" class="btn btn-primary">
+                  Edit Schedule
+                </a>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state">
+          No schedules assigned. Go to <a href="{% url 'schedule_list' %}">Schedule Management</a> to create schedules for this faculty.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,76 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Semestral Reports</title>
+    <link rel="stylesheet" href="{% static 'kbox_app/css/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>Semestral Report</h1>
+
+        <form method="post" class="filter-box" style="margin:16px 0;">
+            {% csrf_token %}
+            <label><strong>Academic Year:</strong></label>
+            {{ form.academic_year }}
+            <label style="margin-left:20px;"><strong>Semester:</strong></label>
+            {{ form.semester }}
+            <button type="submit">Show</button>
+        </form>
+
+        <p>
+            <strong>Selected term:</strong>
+            {{ academic_year }} – {{ semester }}
+        </p>
+
+        <h2>Summary</h2>
+        <p><strong>Total logs:</strong> {{ total_logs }}</p>
+
+        <h2>By Faculty</h2>
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Faculty</th>
+                    <th>Total Sessions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in faculty_summary %}
+                    <tr>
+                        <td>{{ row.rfid__faculty__full_name }}</td>
+                        <td>{{ row.total_sessions }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="2">No data.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h2>By Room</h2>
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Room</th>
+                    <th>Total Sessions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in room_summary %}
+                    <tr>
+                        <td>{{ row.room__code }}</td>
+                        <td>{{ row.total_sessions }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="2">No data.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p style="margin-top:20px;">
+            <a href="{% url 'dashboard' %}">← Back to Dashboard</a>
+        </p>
+    </div>
+</body>
+</html>

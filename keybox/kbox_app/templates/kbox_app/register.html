@@ -1,0 +1,142 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Staff Account</title>
+    <link rel="stylesheet" href="{% static 'kbox_app/css/register.css' %}">
+    <style>
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #388e3c; font-weight: 600; font-size: 14px; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 12px; border: 2px solid #ddd;
+            border-radius: 8px; box-sizing: border-box; font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus, .form-group select:focus { outline: none; border-color: #388e3c; }
+        .errorlist {
+            list-style: none; padding: 8px 12px; margin: 5px 0;
+            background-color: #ffebee; color: #c62828;
+            border-left: 4px solid #c62828; border-radius: 4px; font-size: 13px;
+        }
+        .info-box {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffe082 100%);
+            padding: 20px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; 
+            border-left: 4px solid #ff9800; line-height: 1.6;
+        }
+        .info-box strong { color: #e65100; font-size: 16px; display: block; margin-bottom: 10px; }
+        .required-field::after { content: " *"; color: #d32f2f; }
+        .form-divider { border-top: 2px solid #e0e0e0; margin: 25px 0; }
+    </style>
+</head>
+<body>
+
+<div class="reg-wrapper">
+    <div class="reg-box">
+        <h1>Create Staff Account</h1>
+
+        <div class="info-box">
+            <strong>⚠️ Staff Registration Only</strong>
+            This form creates STAFF accounts for system administrators.<br>
+            <strong>Faculty members</strong> do not need accounts - they use RFID cards only.<br>
+            Staff will manage faculty through the "Faculty Management" page after logging in.
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <ul class="errorlist">
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+
+            <div class="form-group">
+                <label class="required-field">First Name</label>
+                {{ form.first_name }}
+                {% if form.first_name.errors %}
+                    <ul class="errorlist">{% for error in form.first_name.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label>Surname / Middle Name</label>
+                {{ form.surname }}
+            </div>
+
+            <div class="form-group">
+                <label class="required-field">Last Name</label>
+                {{ form.last_name }}
+                {% if form.last_name.errors %}
+                    <ul class="errorlist">{% for error in form.last_name.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label>Birthday</label>
+                {{ form.birthday }}
+            </div>
+
+            <div class="form-group">
+                <label>Gender</label>
+                {{ form.gender }}
+            </div>
+
+            <div class="form-divider"></div>
+
+            <div class="form-group">
+                <label class="required-field">Email Address</label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <ul class="errorlist">{% for error in form.email.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                {% endif %}
+                <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">Used for login</small>
+            </div>
+
+            <div class="form-group">
+                <label>Contact Number</label>
+                {{ form.contact_no }}
+            </div>
+
+            <div class="form-divider"></div>
+
+            <div class="form-group">
+                <label class="required-field">Account Type</label>
+                <select name="user_type" id="id_user_type" class="form-select" required>
+                    <option value="staff">Staff (System Administrator)</option>
+                </select>
+                <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">
+                    ℹ️ Staff accounts have full system access. Faculty use RFID cards and don't need accounts.
+                </small>
+            </div>
+
+            <div class="form-divider"></div>
+
+            <div class="form-group">
+                <label class="required-field">Password</label>
+                {{ form.password1 }}
+                {% if form.password1.errors %}
+                    <ul class="errorlist">{% for error in form.password1.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label class="required-field">Confirm Password</label>
+                {{ form.password2 }}
+                {% if form.password2.errors %}
+                    <ul class="errorlist">{% for error in form.password2.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="signup-btn">Create Staff Account</button>
+        </form>
+
+        <a href="{% url 'login' %}" class="login-link">Already have an account? Login</a>
+    </div>
+</div>
+
+</body>
+</html>

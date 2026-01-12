@@ -1,0 +1,258 @@
+{% extends "kbox_app/base.html" %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>📱 {{ device.device_name }} - Loaded Schedules</h1>
+    <p style="color: #666; margin-top: 10px;">
+      Room {{ device.room.code }} | {{ current_semester }} Semester {{ current_ay }}
+    </p>
+  </div>
+  <a href="{% url 'esp32_list' %}" class="btn btn-secondary">← Back to Devices</a>
+</div>
+
+<!-- Device Status Card -->
+<div class="content-box" style="margin-bottom: 30px;">
+  <h2 style="margin-bottom: 20px;">🔌 Device Status</h2>
+  
+  <div class="status-grid">
+    <!-- WiFi Status -->
+    <div class="status-item">
+      <div class="status-icon">
+        {% if is_online %}
+          <span style="color: #4caf50; font-size: 48px;">📶</span>
+        {% else %}
+          <span style="color: #f44336; font-size: 48px;">📵</span>
+        {% endif %}
+      </div>
+      <div class="status-info">
+        <h3>WiFi Status</h3>
+        <p class="status-value {% if is_online %}text-success{% else %}text-danger{% endif %}">
+          {% if is_online %}
+            ✅ ONLINE
+          {% else %}
+            ❌ OFFLINE
+          {% endif %}
+        </p>
+        <small>
+          {% if time_since_heartbeat %}
+            Last seen: {{ time_since_heartbeat }}
+          {% else %}
+            Never connected
+          {% endif %}
+        </small>
+      </div>
+    </div>
+
+    <!-- Schedule Count -->
+    <div class="status-item">
+      <div class="status-icon">
+        <span style="font-size: 48px;">📅</span>
+      </div>
+      <div class="status-info">
+        <h3>Loaded Schedules</h3>
+        <p class="status-value">{{ schedule_count }}</p>
+        <small>Active schedules in memory</small>
+      </div>
+    </div>
+
+    <!-- RFID Cards -->
+    <div class="status-item">
+      <div class="status-icon">
+        <span style="font-size: 48px;">🔑</span>
+      </div>
+      <div class="status-info">
+        <h3>RFID Cards</h3>
+        <p class="status-value">{{ total_rfid_count }}</p>
+        <small>Authorized cards</small>
+      </div>
+    </div>
+
+    <!-- Device Info -->
+    <div class="status-item">
+      <div class="status-icon">
+        <span style="font-size: 48px;">🔧</span>
+      </div>
+      <div class="status-info">
+        <h3>Device Info</h3>
+        <p class="status-value" style="font-size: 14px; font-family: monospace;">
+          {{ device.device_id }}
+        </p>
+        <small>
+          Firmware: {{ device.firmware_version|default:"Unknown" }}
+        </small>
+      </div>
+    </div>
+  </div>
+
+  <!-- System Status Message -->
+  <div style="margin-top: 30px; padding: 20px; border-radius: 8px; 
+              {% if is_online %}
+                background: #e8f5e9; border-left: 4px solid #4caf50;
+              {% else %}
+                background: #fff3e0; border-left: 4px solid #ff9800;
+              {% endif %}">
+    {% if is_online %}
+      <strong style="color: #2e7d32;">✅ Device is ONLINE</strong>
+      <p style="margin: 10px 0 0 0; color: #555;">
+        This ESP32 can receive real-time updates from the server. 
+        It will check for schedule updates every 5 minutes.
+      </p>
+    {% else %}
+      <strong style="color: #e65100;">⚠️ Device is OFFLINE</strong>
+      <p style="margin: 10px 0 0 0; color: #555;">
+        This ESP32 is currently disconnected from WiFi but should still work using cached schedules. 
+        When WiFi reconnects, it will automatically sync new schedules and send offline access logs.
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Schedules Table -->
+<div class="content-box">
+  <h2 style="margin-bottom: 20px;">📋 Schedules in ESP32 Memory</h2>
+  
+  {% if schedules %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Day(s)</th>
+          <th>Time</th>
+          <th>Subject</th>
+          <th>Faculty</th>
+          <th>Authorized RFID Cards</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sched in schedules %}
+        <tr>
+          <td><strong>{{ sched.days }}</strong></td>
+          <td>
+            <span style="font-family: monospace;">
+              {{ sched.start_time|time:"H:i" }} - {{ sched.end_time|time:"H:i" }}
+            </span>
+          </td>
+          <td>{{ sched.subject|default:"—" }}</td>
+          <td>
+            {% if sched.faculty %}
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <strong>{{ sched.faculty.full_name }}</strong>
+                <small style="color: #666;">{{ sched.faculty.school_id }}</small>
+              </div>
+            {% else %}
+              <span style="color: #999;">No faculty assigned</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if sched.rfid_codes %}
+              <div style="font-family: monospace; font-size: 12px;">
+                {% for rfid in sched.rfid_codes %}
+                  <div style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px; 
+                              display: inline-block; margin: 2px;">
+                    🔑 {{ rfid }}
+                  </div>
+                {% endfor %}
+              </div>
+              <small style="color: #666; display: block; margin-top: 8px;">
+                {{ sched.rfid_count }} card{{ sched.rfid_count|pluralize }}
+              </small>
+            {% else %}
+              <span style="color: #999;">⚠️ No RFID cards assigned</span>
+              <br>
+              <small style="color: #e65100;">
+                This schedule won't work - faculty needs RFID card!
+              </small>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div style="text-align: center; padding: 60px; color: #999;">
+      <p style="font-size: 48px; margin: 0;">📭</p>
+      <p style="font-size: 18px; margin-top: 20px;">
+        No schedules found for Room {{ device.room.code }} in {{ current_semester }} semester
+      </p>
+      <p style="margin-top: 10px;">
+        Add schedules in the Schedule Management page
+      </p>
+      <a href="{% url 'schedule_list' %}" class="btn btn-primary" style="margin-top: 20px;">
+        📅 Go to Schedule Management
+      </a>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Help Section -->
+<div class="content-box" style="background: #f8f9fa; border-left: 4px solid #667eea;">
+  <h3 style="color: #667eea; margin-bottom: 15px;">💡 How This Works</h3>
+  <ul style="line-height: 1.8; color: #555;">
+    <li><strong>Online Mode:</strong> ESP32 downloads these schedules every 5 minutes from Django server</li>
+    <li><strong>Offline Mode:</strong> ESP32 uses cached schedules stored in its flash memory (SPIFFS)</li>
+    <li><strong>RFID Check:</strong> When a card is scanned, ESP32 checks if:
+      <ul style="margin-top: 8px;">
+        <li>✓ The RFID code matches any schedule</li>
+        <li>✓ Current day matches the schedule day</li>
+        <li>✓ Current time is within schedule time range</li>
+      </ul>
+    </li>
+    <li><strong>Auto-Sync:</strong> When WiFi reconnects, ESP32 automatically downloads fresh schedules</li>
+  </ul>
+</div>
+
+<style>
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+  }
+
+  .status-item {
+    display: flex;
+    gap: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    align-items: center;
+  }
+
+  .status-icon {
+    flex-shrink: 0;
+  }
+
+  .status-info h3 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .status-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #333;
+    margin: 0;
+  }
+
+  .status-info small {
+    color: #999;
+    font-size: 12px;
+  }
+
+  .text-success {
+    color: #4caf50 !important;
+  }
+
+  .text-danger {
+    color: #f44336 !important;
+  }
+
+  .data-table tbody tr:hover {
+    background: #f0f7ff;
+  }
+</style>
+
+{% endblock %}

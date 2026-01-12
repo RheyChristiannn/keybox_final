@@ -1,0 +1,185 @@
+{% extends "kbox_app/base.html" %}
+
+{% block content %}
+<div class="page-header">
+  <h1>🔌 ESP32 Device Management</h1>
+  <a href="{% url 'esp32_add' %}" class="btn btn-primary">➕ Add New Device</a>
+</div>
+
+<!-- Status Summary Cards -->
+<div class="summary-grid" style="margin-bottom: 30px;">
+  <div class="summary-card" style="background: linear-gradient(135deg, #4caf50 0%, #66bb6a 100%);">
+    <h3>✅ Online Devices</h3>
+    <p class="value">{{ online_count }}</p>
+  </div>
+  
+  <div class="summary-card" style="background: linear-gradient(135deg, #f44336 0%, #e57373 100%);">
+    <h3>❌ Offline Devices</h3>
+    <p class="value">{{ offline_count }}</p>
+  </div>
+  
+  <div class="summary-card">
+    <h3>📊 Total Devices</h3>
+    <p class="value">{{ total_count }}</p>
+  </div>
+</div>
+
+<div class="content-box">
+  <h2>📋 Registered ESP32 Devices</h2>
+  
+  {% if devices %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th>Device Name</th>
+        <th>Device ID</th>
+        <th>Assigned Room</th>
+        <th>IP Address</th>
+        <th>Last Seen</th>
+        <th>Firmware</th>
+        <th>Active</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for device in devices %}
+      <tr>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="status-dot {{ device.get_status_color }}" 
+                 style="width: 12px; height: 12px; border-radius: 50%; 
+                        background: {{ device.get_status_color }}; 
+                        box-shadow: 0 0 8px {{ device.get_status_color }};
+                        {% if device.is_online %}animation: pulse 2s ease-in-out infinite;{% endif %}">
+            </div>
+            <span style="font-weight: 600; color: {% if device.is_online %}#4caf50{% else %}#f44336{% endif %};">
+              {{ device.get_status_text }}
+            </span>
+          </div>
+        </td>
+        <td><strong>{{ device.device_name }}</strong></td>
+        <td><code style="background: #f5f5f5; padding: 4px 8px; border-radius: 4px;">{{ device.device_id }}</code></td>
+        <td>
+          {% if device.room %}
+            🏫 {{ device.room.code }}
+          {% else %}
+            <span style="color: #999;">Unassigned</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if device.ip_address %}
+            {{ device.ip_address }}
+          {% else %}
+            <span style="color: #999;">Unknown</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if device.last_heartbeat %}
+            {{ device.last_heartbeat|timesince }} ago
+          {% else %}
+            <span style="color: #999;">Never</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if device.firmware_version %}
+            {{ device.firmware_version }}
+          {% else %}
+            <span style="color: #999;">Unknown</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if device.is_active %}
+            <span class="badge badge-success">✓ Active</span>
+          {% else %}
+            <span class="badge badge-danger">✗ Inactive</span>
+          {% endif %}
+        </td>
+        <td>
+          <!-- ✅ UPDATED ACTIONS COLUMN - Added "View Schedules" button -->
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <a href="{% url 'esp32_device_schedules' device.id %}" 
+               class="btn btn-sm btn-primary"
+               title="View loaded schedules"
+               style="white-space: nowrap;">
+              📅 Schedules
+            </a>
+            <a href="{% url 'esp32_edit' device.id %}" 
+               class="btn btn-sm btn-warning"
+               title="Edit device settings">
+              ✏️ Edit
+            </a>
+            <a href="{% url 'esp32_toggle_status' device.id %}" 
+               class="btn btn-sm btn-info"
+               onclick="return confirm('Toggle device status?')"
+               title="Enable or disable device">
+              {% if device.is_active %}⏸️ Disable{% else %}▶️ Enable{% endif %}
+            </a>
+            <a href="{% url 'esp32_delete' device.id %}" 
+               class="btn btn-sm btn-danger"
+               onclick="return confirm('Delete this device permanently?')"
+               title="Delete device">
+              🗑️ Delete
+            </a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align: center; padding: 60px; color: #999;">
+    <p style="font-size: 48px; margin: 0;">📭</p>
+    <p style="font-size: 18px; margin-top: 20px;">No ESP32 devices registered yet</p>
+    <a href="{% url 'esp32_add' %}" class="btn btn-primary" style="margin-top: 20px;">➕ Add Your First Device</a>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.3);
+      opacity: 0.7;
+    }
+  }
+  
+  .badge {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-block;
+  }
+  
+  .badge-success {
+    background: #4caf50;
+    color: white;
+  }
+  
+  .badge-danger {
+    background: #f44336;
+    color: white;
+  }
+
+  /* Button styling for consistency */
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* Ensure action buttons wrap nicely on smaller screens */
+  @media (max-width: 1400px) {
+    .data-table td div {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>
+
+{% endblock %}

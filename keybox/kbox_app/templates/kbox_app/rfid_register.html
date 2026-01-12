@@ -1,0 +1,499 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RFID Registration</title>
+  <link rel="stylesheet" href="{% static 'kbox_app/css/style.css' %}">
+  <!-- Select2 CSS -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    /* ====================== SIDEBAR ======================= */
+    .sidebar {
+      width: 260px;
+      background: linear-gradient(180deg, #2e7d32 0%, #1b5e20 100%);
+      color: white;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      padding-top: 20px;
+      transition: width 0.3s ease;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 4px 0 15px rgba(0,0,0,0.2);
+    }
+
+    .sidebar.collapsed {
+      width: 70px;
+    }
+
+    .toggle-btn {
+      font-size: 28px;
+      cursor: pointer;
+      margin-bottom: 30px;
+      align-self: flex-start;
+      margin-left: 20px;
+      transition: transform 0.3s;
+    }
+
+    .toggle-btn:hover {
+      transform: scale(1.1);
+    }
+
+    .menu {
+      width: 100%;
+    }
+
+    .menu-item {
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      cursor: pointer;
+      transition: all 0.3s;
+      white-space: nowrap;
+      font-size: 16px;
+      border-left: 4px solid transparent;
+    }
+
+    .menu-item:hover {
+      background-color: rgba(255,255,255,0.1);
+      border-left-color: #81c784;
+      padding-left: 25px;
+    }
+
+    .menu-item.active {
+      background-color: rgba(255,255,255,0.15);
+      border-left-color: #ffffff;
+    }
+
+    .menu-item i {
+      font-size: 22px;
+      min-width: 22px;
+    }
+
+    .collapsed .menu-item span {
+      display: none;
+    }
+
+    /* ====================== CONTENT AREA ======================= */
+    .content-area {
+      margin-left: 260px;
+      transition: margin-left 0.3s ease;
+      padding: 30px;
+      width: calc(100% - 260px);
+      min-height: 100vh;
+    }
+
+    .sidebar.collapsed ~ .content-area {
+      margin-left: 70px;
+      width: calc(100% - 70px);
+    }
+
+    /* ====================== PAGE HEADER ======================= */
+    .page-header {
+      background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
+      padding: 20px 30px;
+      border-radius: 15px;
+      margin-bottom: 25px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid rgba(46, 125, 50, 0.1);
+    }
+
+    .page-header h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #2e7d32 0%, #66bb6a 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .logout-btn-top {
+      background: linear-gradient(135deg, #2e7d32 0%, #388e3c 100%);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.3s;
+      box-shadow: 0 2px 8px rgba(46, 125, 50, 0.3);
+      display: inline-block;
+    }
+
+    .logout-btn-top:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(46, 125, 50, 0.4);
+    }
+
+    /* ====================== FORM CONTAINER ======================= */
+    .form-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #2e7d32;
+      text-decoration: none;
+      font-weight: 600;
+      transition: all 0.3s;
+    }
+
+    .back-link:hover {
+      color: #1b5e20;
+      transform: translateX(-5px);
+    }
+
+    .success-msg {
+      background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+      color: #1b5e20;
+      padding: 18px 24px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      border-left: 5px solid #388e3c;
+      font-size: 16px;
+      font-weight: 600;
+      box-shadow: 0 3px 12px rgba(56, 142, 60, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .form-section {
+      background: white;
+      padding: 30px;
+      margin-bottom: 25px;
+      border-radius: 12px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+      border: 1px solid #e0e0e0;
+      border-left: 5px solid #2e7d32;
+    }
+
+    .form-section h3 {
+      color: #2e7d32;
+      margin: 0 0 20px 0;
+      font-size: 20px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-bottom: 15px;
+      border-bottom: 3px solid #e8f5e9;
+    }
+
+    .info-text {
+      color: #666;
+      font-size: 14px;
+      margin-bottom: 20px;
+      line-height: 1.6;
+      padding: 15px;
+      background: linear-gradient(135deg, #f1f8f4 0%, #e8f5e9 100%);
+      border-radius: 8px;
+      border-left: 3px solid #66bb6a;
+    }
+
+    .info-text strong {
+      color: #2e7d32;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+      font-size: 15px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 15px;
+      transition: all 0.3s;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #2e7d32;
+      box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+    }
+
+    .help-text {
+      font-size: 13px;
+      color: #666;
+      font-style: italic;
+      margin-top: 5px;
+      display: block;
+    }
+
+    .errorlist {
+      list-style: none;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+      color: #b71c1c;
+      border-left: 4px solid #d32f2f;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 14px;
+      box-shadow: 0 2px 8px rgba(211, 47, 47, 0.1);
+    }
+
+    .errorlist li {
+      margin: 5px 0;
+    }
+
+    .divider {
+      border: none;
+      border-top: 2px dashed #e0e0e0;
+      margin: 30px 0;
+    }
+
+    button[type="submit"] {
+      background: linear-gradient(135deg, #2e7d32 0%, #388e3c 100%);
+      color: white;
+      padding: 16px 40px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      width: 100%;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: 0 3px 12px rgba(46, 125, 50, 0.3);
+    }
+
+    button[type="submit"]:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(46, 125, 50, 0.4);
+    }
+
+    button[type="submit"]:active {
+      transform: translateY(0);
+    }
+
+    .intro-card {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+      border: 1px solid #e0e0e0;
+    }
+
+    .intro-card p {
+      margin: 0;
+      color: #666;
+      line-height: 1.6;
+    }
+
+    /* ====================== SELECT2 CUSTOMIZATION ======================= */
+    .select2-container--default .select2-selection--single {
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      height: 48px;
+      padding: 6px 15px;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+      line-height: 34px;
+      color: #333;
+      font-size: 15px;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+      height: 46px;
+    }
+
+    .select2-container--default.select2-container--open .select2-selection--single,
+    .select2-container--default.select2-container--focus .select2-selection--single {
+      border-color: #2e7d32;
+      box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.1);
+    }
+
+    .select2-dropdown {
+      border: 2px solid #2e7d32;
+      border-radius: 8px;
+    }
+
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+      background-color: #2e7d32;
+    }
+
+    .select2-container--default .select2-search--dropdown .select2-search__field {
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    .select2-container--default .select2-search--dropdown .select2-search__field:focus {
+      border-color: #2e7d32;
+      outline: none;
+    }
+
+    .select2-container {
+      width: 100% !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================= SIDEBAR ========================= -->
+  <div class="sidebar" id="sidebar">
+    <div class="toggle-btn" onclick="toggleSidebar()">☰</div>
+
+    <ul class="menu">
+      <li class="menu-item" onclick="window.location='{% url 'dashboard' %}'"><i>🏠</i><span>Dashboard</span></li>
+      <li class="menu-item" onclick="window.location='{% url 'room_list' %}'"><i>🏫</i><span>Rooms</span></li>
+      <li class="menu-item" onclick="window.location='{% url 'schedule_list' %}'"><i>📅</i><span>Schedules</span></li>
+      <li class="menu-item" onclick="window.location='{% url 'transaction_logs' %}'"><i>📝</i><span>Transaction Logs</span></li>
+      <li class="menu-item" onclick="window.location='{% url 'faculty_list' %}'"><i>👨🏻‍💼</i><span>Faculty</span></li>
+      <li class="menu-item" onclick="window.location='{% url 'reports' %}'"><i>📊</i><span>Reports</span></li>
+      <li class="menu-item" onclick="window.location='{% url 'logout' %}'"><i>🚪</i><span>Logout</span></li>
+    </ul>
+  </div>
+
+  <!-- ========================= CONTENT AREA ========================= -->
+  <div class="content-area">
+
+    <!-- Back Link -->
+    <a href="{% url 'dashboard' %}" class="back-link">← Back </a>
+
+    <!-- Form Container -->
+    <div class="form-container">
+
+      <!-- Success Message -->
+      {% if success %}
+        <div class="success-msg">
+          ✓ RFID card has been registered successfully!
+        </div>
+      {% endif %}
+
+      <form method="POST">
+        {% csrf_token %}
+
+        <!-- Non-field errors -->
+        {% if form.non_field_errors %}
+          <ul class="errorlist">
+            {% for error in form.non_field_errors %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+
+        <!-- RFID & Room Section -->
+        <div class="form-section">
+          <h3>🔑 RFID Card Information</h3>
+
+          <div class="form-group">
+            <label for="{{ form.rfid_code.id_for_label }}">RFID Code *</label>
+            {% if form.rfid_code.errors %}
+              <ul class="errorlist">
+                {% for error in form.rfid_code.errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+            {{ form.rfid_code }}
+            <span class="help-text">Scan the keybox RFID card or enter the UID manually</span>
+          </div>
+
+          <div class="form-group">
+            <label for="{{ form.room.id_for_label }}">Assigned Room *</label>
+            {% if form.room.errors %}
+              <ul class="errorlist">
+                {% for error in form.room.errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+            {{ form.room }}
+            <span class="help-text">Select which laboratory room this card will access</span>
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Faculty Selection Section -->
+        <div class="form-section">
+          <h3>👤 Faculty Assignment</h3>
+          <p class="info-text">
+            <strong>Select an existing faculty member</strong> from the list below to assign this RFID card. Use the search box to quickly find a faculty member.
+          </p>
+
+          <div class="form-group">
+            <label for="{{ form.faculty.id_for_label }}">Select Faculty Member *</label>
+            {% if form.faculty.errors %}
+              <ul class="errorlist">
+                {% for error in form.faculty.errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+            {{ form.faculty }}
+          </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit">💾 Save RFID Registration</button>
+      </form>
+
+    </div>
+
+  </div> <!-- END CONTENT AREA -->
+
+  <!-- ========================= JAVASCRIPT ========================= -->
+  <!-- jQuery (required for Select2) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <!-- Select2 JS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+  
+  <script>
+    function toggleSidebar() {
+      document.getElementById("sidebar").classList.toggle("collapsed");
+    }
+
+    // Initialize Select2 on the faculty dropdown
+    $(document).ready(function() {
+      $('#{{ form.faculty.id_for_label }}').select2({
+        placeholder: "Search for a faculty member...",
+        allowClear: true,
+        width: '100%',
+        theme: 'default'
+      });
+    });
+  </script>
+</body>
+</html>

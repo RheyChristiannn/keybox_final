@@ -1,0 +1,358 @@
+from django import forms
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.models import User
+
+from .models import TransactionLog, RFIDRegistration, Faculty, UserProfile, Room, RoomSchedule
+
+
+class SemesterChoiceForm(forms.Form):
+    """
+    Filter form for Academic Year + Semester.
+    View passes ay_choices and sem_choices dynamically.
+    """
+    academic_year = forms.ChoiceField(label="Academic Year")
+    semester = forms.ChoiceField(label="Semester")
+
+    def __init__(self, *args, **kwargs):
+        ay_choices = kwargs.pop("ay_choices", [])
+        sem_choices = kwargs.pop("sem_choices", [])
+        super().__init__(*args, **kwargs)
+        self.fields["academic_year"].choices = ay_choices
+        self.fields["semester"].choices = sem_choices
+
+
+class CustomUserRegistrationForm(UserCreationForm):
+    """
+    Registration form for /accounts/register/.
+    We hide username, and internally set it from the email.
+    """
+
+    # Hidden username field so UserCreationForm stays happy
+    username = forms.CharField(widget=forms.HiddenInput(), required=False)
+
+    first_name = forms.CharField(max_length=30, required=True, label="First name")
+    surname = forms.CharField(
+        max_length=100, required=False, label="Surname / Middle name"
+    )
+    last_name = forms.CharField(max_length=150, required=True, label="Last name")
+    birthday = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Birthday",
+    )
+    gender = forms.ChoiceField(
+        choices=[("", "Select Gender"), ("M", "Male"), ("F", "Female"), ("O", "Other")],
+        required=False,
+        label="Gender",
+    )
+    email = forms.EmailField(required=True, label="Email address")
+    contact_no = forms.CharField(
+        max_length=20, required=False, label="Contact no."
+    )
+    user_type = forms.ChoiceField(
+        choices=[("staff", "Staff"), ("client", "Client")],
+        required=True,
+        label="User Type",
+        initial="client",
+        help_text="Select Staff for full access or Client for basic access"
+    )
+    rfid_code = forms.CharField(
+        max_length=50,
+        required=False,
+        label="RFID Code",
+        help_text="Optional: Scan or enter RFID card number"
+    )
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = (
+            "username",
+            "first_name",
+            "surname",
+            "last_name",
+            "birthday",
+            "gender",
+            "email",
+            "contact_no",
+            "user_type",
+            "rfid_code",
+            "password1",
+            "password2",
+        )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # We don't want the user to see username, it's hidden
+        self.fields["username"].widget = forms.HiddenInput()
+        self.fields["username"].required = False
+
+        self.fields["first_name"].widget.attrs.update({"placeholder": "First name"})
+        self.fields["surname"].widget.attrs.update({"placeholder": "Surname / Middle name"})
+        self.fields["last_name"].widget.attrs.update({"placeholder": "Last name"})
+        self.fields["birthday"].widget.attrs.update({})
+        self.fields["gender"].widget.attrs.update({"class": "form-select"})
+        self.fields["email"].widget.attrs.update({"placeholder": "Email address"})
+        self.fields["contact_no"].widget.attrs.update({"placeholder": "Contact no."})
+        self.fields["user_type"].widget.attrs.update({"class": "form-select"})
+        self.fields["rfid_code"].widget.attrs.update({"placeholder": "Scan or enter RFID code"})
+        self.fields["password1"].widget.attrs.update({"placeholder": "Password"})
+        self.fields["password2"].widget.attrs.update({"placeholder": "Confirm password"})
+
+    def clean_email(self):
+        email = self.cleaned_data.get("email", "").lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("A user with that email already exists.")
+        return email
+
+    def clean_rfid_code(self):
+        rfid_code = self.cleaned_data.get("rfid_code", "").strip()
+        if rfid_code:
+            # Check if RFID code already exists in UserProfile
+            if UserProfile.objects.filter(rfid_code=rfid_code).exists():
+                raise forms.ValidationError("This RFID code is already registered to another user.")
+        return rfid_code if rfid_code else None
+
+    def clean(self):
+        """
+        Set the hidden username field from email so UserCreationForm
+        can use it without errors.
+        """
+        cleaned_data = super().clean()
+        email = cleaned_data.get("email")
+        if email:
+            cleaned_data["username"] = email.lower()
+            self.cleaned_data["username"] = email.lower()
+        return cleaned_data
+
+    def save(self, commit=True):
+        email = self.cleaned_data["email"].lower()
+
+        # This calls UserCreationForm.save(), which will now see username set
+        user = super().save(commit=False)
+
+        # store basic fields on User
+        user.username = email            # internal username = email
+        user.first_name = self.cleaned_data["first_name"]
+        user.last_name = self.cleaned_data["last_name"]
+        user.email = email
+
+        if commit:
+            user.save()
+            UserProfile.objects.create(
+                user=user,
+                surname=self.cleaned_data.get("surname", ""),
+                birthday=self.cleaned_data.get("birthday"),
+                gender=self.cleaned_data.get("gender", ""),
+                contact_no=self.cleaned_data.get("contact_no", ""),
+                user_type=self.cleaned_data.get("user_type", "client"),
+                rfid_code=self.cleaned_data.get("rfid_code"),
+            )
+        return user
+
+
+class EmailAuthenticationForm(AuthenticationForm):
+    """
+    Login form that uses email + password instead of username.
+    Internally still passes username to Django auth.
+    """
+    username = forms.EmailField(
+        label="Email add",
+        widget=forms.EmailInput(attrs={"placeholder": "Email add"}),
+    )
+
+    def clean(self):
+        # 'username' field actually contains email here
+        email = self.cleaned_data.get("username")
+        password = self.cleaned_data.get("password")
+
+        if email and password:
+            try:
+                user_obj = User.objects.get(email__iexact=email)
+            except User.DoesNotExist:
+                raise forms.ValidationError("Invalid email or password.")
+
+            # Replace email with real username for parent .clean()
+            self.cleaned_data["username"] = user_obj.username
+
+        return super().clean()
+
+
+class RFIDRegistrationForm(forms.ModelForm):
+    """
+    Form for admin to register new RFID cards for faculty + room.
+    Now includes department selection for new faculty.
+    """
+    faculty_name = forms.CharField(
+        max_length=150,
+        required=False,
+        label="Faculty Name",
+        help_text="Enter name if creating new faculty",
+        widget=forms.TextInput(attrs={"placeholder": "Leave blank to select existing faculty"})
+    )
+    
+    school_id = forms.CharField(
+        max_length=50,
+        required=False,
+        label="School ID",
+        help_text="Required if creating new faculty",
+        widget=forms.TextInput(attrs={"placeholder": "Employee/School ID"})
+    )
+    
+    department = forms.ChoiceField(
+        choices=[("", "Select Department")] + Faculty.DEPARTMENT_CHOICES,
+        required=False,
+        label="Department",
+        help_text="Required if creating new faculty"
+    )
+
+    class Meta:
+        model = RFIDRegistration
+        fields = ["rfid_code", "faculty", "room"]
+        widgets = {
+            "rfid_code": forms.TextInput(attrs={"placeholder": "Keybox RFID code"}),
+        }
+        labels = {
+            "rfid_code": "Keybox RFID Code",
+            "faculty": "Select Existing Faculty (or leave blank to create new)",
+            "room": "Assigned Room",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["faculty"].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        faculty = cleaned_data.get("faculty")
+        faculty_name = cleaned_data.get("faculty_name")
+        school_id = cleaned_data.get("school_id")
+        department = cleaned_data.get("department")
+
+        # Either select existing faculty OR provide new faculty details
+        if not faculty:
+            if not faculty_name or not school_id or not department:
+                raise forms.ValidationError(
+                    "Either select an existing faculty or provide Faculty Name, School ID, and Department for a new faculty."
+                )
+        
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        
+        # If no faculty selected, create new one
+        if not instance.faculty:
+            faculty = Faculty.objects.create(
+                school_id=self.cleaned_data["school_id"],
+                full_name=self.cleaned_data["faculty_name"],
+                department=self.cleaned_data["department"]
+            )
+            instance.faculty = faculty
+        
+        if commit:
+            instance.save()
+        
+        return instance
+
+
+class TransactionLogForm(forms.ModelForm):
+    """
+    Optional manual log form (if ever used).
+    """
+
+    class Meta:
+        model = TransactionLog
+        fields = ["rfid", "room", "academic_year", "semester", "open_time", "close_time"]
+        widgets = {
+            "open_time": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "close_time": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["rfid"].label_from_instance = (
+            lambda obj: f"{obj.faculty.full_name} ({obj.rfid_code})"
+        )
+
+
+# ========== NEW MANAGEMENT FORMS ==========
+# Added for Room, Schedule, and Client Management
+
+class RoomForm(forms.ModelForm):
+    """Form for adding/editing rooms"""
+    class Meta:
+        model = Room
+        fields = ['code', 'description', 'is_active']
+        widgets = {
+            'code': forms.TextInput(attrs={'placeholder': 'e.g., 203', 'class': 'form-control'}),
+            'description': forms.TextInput(attrs={'placeholder': 'Room description', 'class': 'form-control'}),
+        }
+        labels = {
+            'code': 'Room Code',
+            'description': 'Description',
+            'is_active': 'Active Status'
+        }
+
+
+class RoomScheduleForm(forms.ModelForm):
+    """Form for creating/editing room schedules"""
+    class Meta:
+        model = RoomSchedule
+        fields = ['room', 'day_of_week', 'start_time', 'end_time', 'subject', 'instructor_name', 'is_active']
+        widgets = {
+            'room': forms.Select(attrs={'class': 'form-control'}),
+            'day_of_week': forms.Select(attrs={'class': 'form-control'}),
+            'start_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
+            'end_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
+            'subject': forms.TextInput(attrs={'placeholder': 'Subject name', 'class': 'form-control'}),
+            'instructor_name': forms.TextInput(attrs={'placeholder': 'Instructor name', 'class': 'form-control'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only show active rooms in dropdown
+        self.fields['room'].queryset = Room.objects.filter(is_active=True)
+
+
+class ClientManagementForm(forms.ModelForm):
+    """Form for managing clients and their RFID"""
+    first_name = forms.CharField(max_length=30, required=True)
+    last_name = forms.CharField(max_length=150, required=True)
+    email = forms.EmailField(required=True)
+    
+    class Meta:
+        model = UserProfile
+        fields = ['surname', 'birthday', 'gender', 'contact_no', 'rfid_code', 'is_active']
+        widgets = {
+            'surname': forms.TextInput(attrs={'placeholder': 'Middle name', 'class': 'form-control'}),
+            'birthday': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'gender': forms.Select(attrs={'class': 'form-control'}),
+            'contact_no': forms.TextInput(attrs={'placeholder': 'Contact number', 'class': 'form-control'}),
+            'rfid_code': forms.TextInput(attrs={'placeholder': 'Scan RFID card', 'class': 'form-control'}),
+        }
+        labels = {
+            'surname': 'Middle Name',
+            'rfid_code': 'RFID Card Number',
+            'is_active': 'Active Status'
+        }
+    
+    def __init__(self, *args, **kwargs):
+        self.user_instance = kwargs.pop('user_instance', None)
+        super().__init__(*args, **kwargs)
+        
+        if self.user_instance:
+            self.fields['first_name'].initial = self.user_instance.first_name
+            self.fields['last_name'].initial = self.user_instance.last_name
+            self.fields['email'].initial = self.user_instance.email
+    
+    def clean_rfid_code(self):
+        rfid_code = self.cleaned_data.get('rfid_code', '').strip()
+        if rfid_code:
+            # Check if RFID already exists (excluding current instance)
+            existing = UserProfile.objects.filter(rfid_code=rfid_code)
+            if self.instance.pk:
+                existing = existing.exclude(pk=self.instance.pk)
+            if existing.exists():
+                raise forms.ValidationError("This RFID code is already assigned to another user.")
+        return rfid_code or None

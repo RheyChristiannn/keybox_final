@@ -1,0 +1,171 @@
+from django.db import models
+from django.utils import timezone
+from django.contrib.auth.models import User
+
+
+class UserProfile(models.Model):
+    GENDER_CHOICES = [
+        ("M", "Male"),
+        ("F", "Female"),
+        ("O", "Other"),
+    ]
+    
+    USER_TYPE_CHOICES = [
+        ("staff", "Staff"),
+        ("client", "Client"),
+    ]
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="profile"
+    )
+    # surname here = middle name / maiden name, etc.
+    surname = models.CharField(max_length=100, blank=True)
+    birthday = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True)
+    contact_no = models.CharField(max_length=20, blank=True)
+    user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES, default="client")
+    rfid_code = models.CharField(max_length=50, blank=True, null=True)
+    is_active = models.BooleanField(default=True)  # NEW: For enable/disable
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['rfid_code'],
+                condition=models.Q(rfid_code__isnull=False) & ~models.Q(rfid_code=''),
+                name='unique_rfid_code'
+            )
+        ]
+
+    def __str__(self):
+        return self.user.get_full_name() or self.user.username
+
+
+class Room(models.Model):
+    """
+    Laboratory rooms like 203, 204, 205, ...
+    """
+    code = models.CharField(max_length=10, unique=True)  # e.g. "203"
+    description = models.CharField(max_length=100, blank=True)
+    is_active = models.BooleanField(default=True)  # NEW: For enable/disable
+    created_at = models.DateTimeField(auto_now_add=True)  # NEW: Track creation
+    updated_at = models.DateTimeField(auto_now=True)  # NEW: Track updates
+
+    def __str__(self):
+        return f"Lab {self.code}" if self.code else "Lab room"
+
+
+class Course(models.Model):
+    """
+    Optional: course using a specific lab.
+    """
+    course_name = models.CharField(max_length=100)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    start_date = models.DateField(default=timezone.now)
+    end_date = models.DateField(default=timezone.now)
+
+    def __str__(self):
+        return self.course_name
+
+
+class Faculty(models.Model):
+    """
+    Employee / faculty record.
+    school_id = school RFID or employee ID.
+    """
+    DEPARTMENT_CHOICES = [
+        ("COE", "College of Engineering"),
+        ("CCIS", "College of Computing and Information Sciences"),
+        ("CBT", "College of Business and Technology"),
+        ("CAS", "College of Arts and Sciences"),
+        ("CTE", "College of Teacher Education"),
+    ]
+    
+    school_id = models.CharField(max_length=50, unique=True)
+    full_name = models.CharField(max_length=150)
+    department = models.CharField(max_length=10, choices=DEPARTMENT_CHOICES, default="COE")
+    is_active = models.BooleanField(default=True)  # NEW: For enable/disable
+
+    def __str__(self):
+        return f"{self.full_name} ({self.school_id})"
+
+
+class RFIDRegistration(models.Model):
+    """
+    Maps a keybox RFID tag to a faculty member and a room.
+    """
+    rfid_code = models.CharField(max_length=50, unique=True)  # RFID from the keybox reader
+    faculty = models.ForeignKey(Faculty, on_delete=models.CASCADE, related_name="rfid_cards")
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True)  # NEW: For enable/disable
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.rfid_code} -> {self.faculty.full_name} / {self.room.code}"
+
+
+class RoomSchedule(models.Model):
+    """
+    Schedule for each laboratory room (admin-only CRUD).
+    """
+    DAY_CHOICES = [
+        ("Mon", "Monday"),
+        ("Tue", "Tuesday"),
+        ("Wed", "Wednesday"),
+        ("Thu", "Thursday"),
+        ("Fri", "Friday"),
+        ("Sat", "Saturday"),
+    ]
+
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+    day_of_week = models.CharField(max_length=3, choices=DAY_CHOICES)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    subject = models.CharField(max_length=100, blank=True)
+    instructor_name = models.CharField(max_length=100, blank=True)
+    is_active = models.BooleanField(default=True)  # NEW: For enable/disable
+    created_at = models.DateTimeField(auto_now_add=True)  # NEW
+    updated_at = models.DateTimeField(auto_now=True)  # NEW
+
+    def __str__(self):
+        return f"{self.room} {self.get_day_of_week_display()} {self.start_time}-{self.end_time}"
+
+
+class TransactionLog(models.Model):
+    """
+    One open/close session in the keybox.
+    """
+    SEMESTER_CHOICES = [
+        ("1st", "1st Semester"),
+        ("2nd", "2nd Semester"),
+        ("summer", "Summer"),
+        ("summer2", "Summer 2"),
+
+    ]
+
+    AY_CHOICES = [
+        ("2024-2025", "2024-2025"),
+        ("2025-2026", "2025-2026"),
+        ("2026-2027", "2026-2027"),
+        ("2027-2028", "2027-2028"),
+        ("2028-2029", "2028-2029"),
+    ]
+
+    rfid = models.ForeignKey(RFIDRegistration, on_delete=models.CASCADE)
+    room = models.ForeignKey(Room, on_delete=models.CASCADE)
+
+    academic_year = models.CharField(
+        max_length=20,
+        choices=AY_CHOICES,
+        default="2025-2026",
+    )
+    semester = models.CharField(
+        max_length=10,
+        choices=SEMESTER_CHOICES,
+        default="1st",
+    )
+
+    open_time = models.DateTimeField(null=True, blank=True)
+    close_time = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.rfid.faculty.full_name} - {self.room.code} - {self.academic_year} {self.semester}"

@@ -1,0 +1,254 @@
+/* ===== Global reset ===== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ===== Page background & typography ===== */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  background: radial-gradient(circle at top, #258129 0, #1b5e20 45%, #0b3d0f 100%);
+  color: #fefefe;
+  min-height: 100vh;
+}
+
+/* ===== Top bar / navbar (used in dashboard.html inline as .top-container) ===== */
+.top-container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 20px auto 40px auto;
+  background: linear-gradient(120deg, #2e7d32, #43a047);
+  color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 28px;
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.top-container h1 {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+/* generic main container used on most pages */
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto 40px auto;
+  padding: 24px 26px 32px;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 20px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+/* ===== Buttons ===== */
+button,
+.logout-btn,
+a.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: none;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  background: #fdd835;
+  color: #20451f;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+button:hover,
+.logout-btn:hover,
+a.logout-btn:hover {
+  background: #ffe65c;
+  transform: translateY(-1px);
+  box-shadow: 0 7px 16px rgba(0, 0, 0, 0.4);
+}
+
+button:active,
+.logout-btn:active,
+a.logout-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* secondary / subtle button style (links inside cards) */
+.btn-secondary {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* ===== Filter bar (AY / Semester / Room) ===== */
+.filter-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 16px;
+}
+
+.filter-box label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.filter-box select,
+.filter-box input {
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(17, 49, 20, 0.9);
+  color: #fefefe;
+  font-size: 0.9rem;
+  min-width: 140px;
+}
+
+.filter-box select:focus,
+.filter-box input:focus {
+  outline: none;
+  border-color: #fdd835;
+  box-shadow: 0 0 0 2px rgba(253, 216, 53, 0.6);
+}
+
+/* ===== Generic “card” sections (summary, schedules, logs) ===== */
+.inner-box {
+  background: rgba(17, 49, 24, 0.95);
+  padding: 22px 22px 24px;
+  margin-bottom: 24px;
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+.inner-box h2 {
+  margin-bottom: 14px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+/* Nice spacing for text inside cards */
+.inner-box p {
+  margin-bottom: 6px;
+  font-size: 0.98rem;
+}
+
+/* ===== Tables (schedules + logs + reports) ===== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  text-align: left;
+}
+
+th {
+  background: rgba(0, 0, 0, 0.4);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+tbody tr:nth-child(odd) {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+tbody tr:hover {
+  background: rgba(76, 175, 80, 0.35);
+}
+
+/* center “no data” rows */
+tbody tr td[colspan] {
+  text-align: center;
+  font-style: italic;
+  color: #d7e4d7;
+}
+
+/* ===== Messages ===== */
+.success-msg {
+  color: #c8e6c9;
+  background: rgba(46, 125, 50, 0.4);
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.error-msg {
+  color: #ffebee;
+  background: rgba(211, 47, 47, 0.5);
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+/* ===== Links ===== */
+a {
+  color: #ffeb3b;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ===== Responsive tweaks ===== */
+@media (max-width: 768px) {
+  .top-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .container {
+    padding: 18px 16px 24px;
+    margin-bottom: 24px;
+  }
+
+  .filter-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  table {
+    font-size: 0.83rem;
+  }
+
+  th,
+  td {
+    padding: 8px 6px;
+  }
+
+  button,
+  .logout-btn,
+  a.logout-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

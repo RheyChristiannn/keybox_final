@@ -1,0 +1,175 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{% static 'kbox_app/css/style.css' %}">
+  <style>
+    .form-container {
+      max-width: 600px;
+      margin: 40px auto;
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .form-header {
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #388e3c;
+    }
+    .form-header h1 {
+      margin: 0;
+      color: #388e3c;
+      font-size: 24px;
+    }
+    .form-group {
+      margin-bottom: 25px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: border 0.3s;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #388e3c;
+    }
+    .form-group input[type="checkbox"] {
+      width: auto;
+      margin-right: 8px;
+    }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+    }
+    .checkbox-group label {
+      margin: 0;
+    }
+    .error {
+      color: #d32f2f;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    .form-actions {
+      display: flex;
+      gap: 15px;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+    }
+    .btn {
+      padding: 14px 32px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.3s;
+    }
+    .btn-primary {
+      background: #388e3c;
+      color: white;
+      flex: 1;
+    }
+    .btn-primary:hover {
+      background: #2e7d32;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(56, 142, 60, 0.3);
+    }
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #666;
+      flex: 1;
+    }
+    .btn-secondary:hover {
+      background: #e0e0e0;
+    }
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #388e3c;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    .help-text {
+      font-size: 13px;
+      color: #666;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="{% url 'room_list' %}" class="back-link">← Back to Room List</a>
+    
+    <div class="form-container">
+      <div class="form-header">
+        <h1>{{ title }}</h1>
+      </div>
+      
+      <form method="post">
+        {% csrf_token %}
+        
+        <div class="form-group">
+          <label for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
+          {{ form.code }}
+          {% if form.code.errors %}
+            <div class="error">{{ form.code.errors.0 }}</div>
+          {% endif %}
+          <div class="help-text">Enter the room code (e.g., 203, 204)</div>
+        </div>
+        
+        <div class="form-group">
+          <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+          {{ form.description }}
+          {% if form.description.errors %}
+            <div class="error">{{ form.description.errors.0 }}</div>
+          {% endif %}
+          <div class="help-text">Optional: Add a description for this room</div>
+        </div>
+        
+        <div class="form-group">
+          <div class="checkbox-group">
+            {{ form.is_active }}
+            <label for="{{ form.is_active.id_for_label }}">{{ form.is_active.label }}</label>
+          </div>
+          {% if form.is_active.errors %}
+            <div class="error">{{ form.is_active.errors.0 }}</div>
+          {% endif %}
+          <div class="help-text">Uncheck to disable this room temporarily</div>
+        </div>
+        
+        {% if form.non_field_errors %}
+          <div class="error">{{ form.non_field_errors }}</div>
+        {% endif %}
+        
+        <div class="form-actions">
+          <a href="{% url 'room_list' %}" class="btn btn-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary">{{ button_text }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

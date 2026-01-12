@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <!-- Directly link CSS without {% load static %} -->
+    <link rel="stylesheet" href="{% static 'kbox_app/css/login.css' %}">
+</head>
+<body>
+    <div class="auth-container">
+        <h2>Login</h2>
+        <form method="POST">
+            <!-- Django CSRF token still works -->
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit" class="auth-btn">Login</button>
+        </form>
+        <p>
+            Don't have an account? 
+            <a href="{% url 'register' %}" class="auth-link">Register here</a>
+        </p>
+    </div>
+</body>
+</html>

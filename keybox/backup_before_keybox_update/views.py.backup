@@ -1,0 +1,419 @@
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import user_passes_test, login_required
+from django.contrib.auth import login, logout
+from django.contrib.auth.forms import AuthenticationForm
+from django.utils import timezone
+from django.http import JsonResponse, HttpResponseForbidden
+from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Count
+from functools import wraps
+from datetime import datetime
+
+from .models import TransactionLog, Room, RoomSchedule, RFIDRegistration, UserProfile
+from .forms import (
+    SemesterChoiceForm,
+    RFIDRegistrationForm,
+    CustomUserRegistrationForm,
+    EmailAuthenticationForm,
+)
+
+
+# ---------- Custom Decorators ----------
+def staff_or_superuser_required(view_func):
+    """
+    Decorator to allow access to staff users or superusers
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login')
+        
+        # Allow superusers
+        if request.user.is_superuser:
+            return view_func(request, *args, **kwargs)
+        
+        # Allow staff users
+        try:
+            if request.user.profile.user_type == 'staff':
+                return view_func(request, *args, **kwargs)
+        except UserProfile.DoesNotExist:
+            pass
+        
+        # Deny access to clients and others
+        return HttpResponseForbidden("Access denied. Staff or admin privileges required.")
+    
+    return wrapper
+
+
+def client_required(view_func):
+    """
+    Decorator for client-only views
+    """
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login')
+        
+        try:
+            if request.user.profile.user_type == 'client':
+                return view_func(request, *args, **kwargs)
+        except UserProfile.DoesNotExist:
+            pass
+        
+        return HttpResponseForbidden("Access denied. Client access required.")
+    
+    return wrapper
+
+
+# ---------- helper for dynamic Academic Year + Semester choices ----------
+def get_term_choices():
+    """
+    Build Academic Year and Semester choices from existing TransactionLog data.
+    This avoids hard-coding AY/semester lists in code.
+    """
+    qs = TransactionLog.objects.all()
+
+    ay_values = list(qs.values_list("academic_year", flat=True).distinct())
+    sem_values = list(qs.values_list("semester", flat=True).distinct())
+
+    # Amo diri ang year
+    if not ay_values:
+        current_year = datetime.now().year
+        ay_values = []
+
+    # Generate next 5 academic years
+    for i in range(5):
+        start = current_year + i
+        end = start + 1
+        ay_values.append(f"{start}-{end}")
+    if not sem_values:
+        sem_values = ["1st", "2nd", "summer", "Summer 2"]
+
+    ay_choices = [(ay, ay) for ay in ay_values]
+
+    def sem_label(s):
+        if s in ["1st", "2nd"]:
+            return f"{s} Semester"
+        if s.lower() == "summer":
+            return "Summer"
+        return s
+
+    sem_choices = [(s, sem_label(s)) for s in sem_values]
+    return ay_choices, sem_choices
+
+
+def register_view(request):
+    """
+    Public registration page - anyone can register
+    """
+    if request.method == 'POST':
+        form = CustomUserRegistrationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            # Optional: Auto-login after registration
+            # login(request, user)
+            # return redirect('dashboard')
+            return redirect('login')
+    else:
+        form = CustomUserRegistrationForm()
+    return render(request, 'kbox_app/register.html', {'form': form})
+
+
+def login_view(request):
+    """
+    Public login page
+    """
+    if request.method == 'POST':
+        form = EmailAuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            
+            # Redirect based on user type
+            try:
+                if user.is_superuser:
+                    return redirect('dashboard')
+                elif user.profile.user_type == 'staff':
+                    return redirect('dashboard')
+                else:  # client
+                    return redirect('dashboard')  # or create a separate client dashboard
+            except UserProfile.DoesNotExist:
+                return redirect('dashboard')
+    else:
+        form = EmailAuthenticationForm(request)
+    return render(request, 'kbox_app/login.html', {'form': form})
+
+
+def logout_view(request):
+    """
+    Logout view
+    """
+    logout(request)
+    return redirect('login')
+
+
+@login_required
+def dashboard(request):
+    """
+    Dashboard can open client and also staff and superusers
+    Clients are redirected or shown limited view
+    """
+    # ----- build dynamic choices for AY + semester -----
+    ay_choices, sem_choices = get_term_choices()
+
+    # ----- Filters (AY + semester + room) -----
+    if request.method == "POST":
+        semester_form = SemesterChoiceForm(
+            request.POST,
+            ay_choices=ay_choices,
+            sem_choices=sem_choices,
+        )
+        if semester_form.is_valid():
+            request.session["selected_ay"] = semester_form.cleaned_data["academic_year"]
+            request.session["selected_semester"] = semester_form.cleaned_data["semester"]
+
+        selected_room_code = request.POST.get("room", "all")
+        request.session["selected_room_code"] = selected_room_code
+    else:
+        selected_ay = request.session.get("selected_ay") or ay_choices[0][0]
+        selected_semester = request.session.get("selected_semester") or sem_choices[0][0]
+        selected_room_code = request.session.get("selected_room_code", "all")
+        semester_form = SemesterChoiceForm(
+            initial={"academic_year": selected_ay, "semester": selected_semester},
+            ay_choices=ay_choices,
+            sem_choices=sem_choices,
+        )
+
+    # get latest values from session (for both GET and POST)
+    selected_ay = request.session.get("selected_ay") or ay_choices[0][0]
+    selected_semester = request.session.get("selected_semester") or sem_choices[0][0]
+    selected_room_code = request.session.get("selected_room_code", "all")
+
+    transaction_logs = (
+        TransactionLog.objects
+        .filter(academic_year=selected_ay, semester=selected_semester)
+        .select_related("rfid", "rfid__faculty", "room")
+        .order_by("-open_time")
+    )
+
+    if selected_room_code != "all":
+        transaction_logs = transaction_logs.filter(room__code=selected_room_code)
+
+    # ----- Stats -----
+    total_logs = transaction_logs.count()
+    logs_today = transaction_logs.filter(open_time__date=timezone.now().date()).count()
+    active_rooms = transaction_logs.values("room").distinct().count()
+    
+    # Only calculate faculty count for staff/superusers
+    faculty_count = 0
+    if request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.user_type == 'staff'):
+        faculty_count = transaction_logs.values("rfid__faculty__full_name").distinct().count()
+
+    # ----- Schedules -----
+    rooms = Room.objects.all().order_by("code")
+
+    if selected_room_code != "all":
+        current_schedules = RoomSchedule.objects.filter(
+            room__code=selected_room_code
+        ).order_by("day_of_week", "start_time")
+    else:
+        current_schedules = RoomSchedule.objects.all().select_related("room").order_by(
+            "room__code", "day_of_week", "start_time"
+        )
+
+    # Check user type for template context
+    user_type = 'superuser' if request.user.is_superuser else request.user.profile.user_type
+    
+    # NEW: Determine if user can see names (staff and superusers only)
+    can_see_names = request.user.is_superuser or (
+        hasattr(request.user, 'profile') and request.user.profile.user_type == 'staff'
+    )
+
+    ctx = {
+        "semester_form": semester_form,
+        "transaction_logs": transaction_logs,
+        "total_logs": total_logs,
+        "faculty_count": faculty_count,
+        "logs_today": logs_today,
+        "active_rooms": active_rooms,
+        "rooms": rooms,
+        "selected_room_code": selected_room_code,
+        "current_schedules": current_schedules,
+        "user_type": user_type,
+        "can_see_names": can_see_names,  # NEW: Pass this flag to template
+    }
+    return render(request, "kbox_app/dashboard.html", ctx)
+
+
+@staff_or_superuser_required
+def rfid_register(request):
+    """
+    Admin page to register new RFID cards.
+    Accessible by staff and superusers
+    """
+    success = False
+
+    if request.method == "POST":
+        form = RFIDRegistrationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            success = True
+            form = RFIDRegistrationForm()
+    else:
+        form = RFIDRegistrationForm()
+
+    ctx = {"form": form, "success": success}
+    return render(request, "kbox_app/rfid_register.html", ctx)
+
+
+@login_required
+def reports(request):
+    """
+    Semestral report page.
+    Accessible by staff and superusers
+    """
+    ay_choices, sem_choices = get_term_choices()
+
+    if request.method == "POST":
+        form = SemesterChoiceForm(
+            request.POST,
+            ay_choices=ay_choices,
+            sem_choices=sem_choices,
+        )
+        if form.is_valid():
+            ay = form.cleaned_data["academic_year"]
+            sem = form.cleaned_data["semester"]
+        else:
+            ay = ay_choices[0][0]
+            sem = sem_choices[0][0]
+    else:
+        ay = ay_choices[0][0]
+        sem = sem_choices[0][0]
+        form = SemesterChoiceForm(
+            initial={"academic_year": ay, "semester": sem},
+            ay_choices=ay_choices,
+            sem_choices=sem_choices,
+        )
+
+    logs = (
+        TransactionLog.objects
+        .filter(academic_year=ay, semester=sem)
+        .select_related("rfid", "rfid__faculty", "room")
+    )
+
+    faculty_summary = (
+        logs.values("rfid__faculty__full_name")
+        .annotate(total_sessions=Count("id"))
+        .order_by("rfid__faculty__full_name")
+    )
+
+    room_summary = (
+        logs.values("room__code")
+        .annotate(total_sessions=Count("id"))
+        .order_by("room__code")
+    )
+
+    ctx = {
+        "form": form,
+        "academic_year": ay,
+        "semester": sem,
+        "faculty_summary": faculty_summary,
+        "room_summary": room_summary,
+        "total_logs": logs.count(),
+    }
+    return render(request, "kbox_app/reports.html", ctx)
+
+
+# ---------- RFID SWIPE API ----------
+@csrf_exempt
+def rfid_swipe(request):
+    """
+    API for Arduino/keybox.
+
+    Example:
+      GET /accounts/api/rfid-swipe/?code=123456&room=203
+    """
+    code = request.GET.get("code") or request.POST.get("code")
+    room_code = request.GET.get("room") or request.POST.get("room")
+
+    if not code or not room_code:
+        return JsonResponse(
+            {"status": "error", "message": "Missing 'code' or 'room'"},
+            status=400,
+        )
+
+    try:
+        rfid = RFIDRegistration.objects.select_related("faculty").get(rfid_code=code)
+    except RFIDRegistration.DoesNotExist:
+        return JsonResponse(
+            {"status": "error", "message": "Unknown RFID card"}, status=404
+        )
+
+    try:
+        room = Room.objects.get(code=room_code)
+    except Room.DoesNotExist:
+        return JsonResponse(
+            {"status": "error", "message": "Unknown room code"}, status=404
+        )
+
+    now = timezone.now()
+    month = now.month
+
+    # Custom semester logic including Summer 2
+    if month in [4, 5]:
+        semester = "summer"
+    elif month in [6]:
+        semester = "summer2"
+    elif month in [7, 8, 9, 10]:
+        semester = "1st"
+    elif month in [11, 12, 1, 2, 3]:
+        semester = "2nd"
+    else:
+        semester = "summer"  # fallback
+
+
+    # simple AY based on current & next year
+    year = now.year
+    if month >= 6:
+        academic_year = f"{year}-{year+1}"
+    else:
+        academic_year = f"{year-1}-{year}"
+
+    open_log = (
+        TransactionLog.objects
+        .filter(
+            rfid=rfid,
+            room=room,
+            academic_year=academic_year,
+            semester=semester,
+            close_time__isnull=True,
+        )
+        .order_by("-open_time")
+        .first()
+    )
+
+    if open_log:
+        open_log.close_time = now
+        open_log.save()
+        action = "CLOSE"
+    else:
+        TransactionLog.objects.create(
+            rfid=rfid,
+            room=room,
+            academic_year=academic_year,
+            semester=semester,
+            open_time=now,
+        )
+        action = "OPEN"
+
+    return JsonResponse(
+        {
+            "status": "ok",
+            "action": action,
+            "faculty": rfid.faculty.full_name,
+            "room": room.code,
+            "time": now.isoformat(),
+            "academic_year": academic_year,
+            "semester": semester,
+        }
+    )

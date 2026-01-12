@@ -1,0 +1,70 @@
+/* =============================== */
+/* LOGIN & REGISTRATION PAGE STYLE */
+/* =============================== */
+
+.auth-container {
+  width: 100%;
+  max-width: 420px;
+  margin: 120px auto;
+  padding: 30px;
+  background-color: white;
+  color: #2e7d32; /* green text */
+  border-radius: 14px;
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+.auth-container h2 {
+  font-size: 28px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #2e7d32;
+}
+
+.auth-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.auth-container input {
+  padding: 14px;
+  border-radius: 8px;
+  border: 2px solid #2e7d32;
+  font-size: 16px;
+}
+
+.auth-container input:focus {
+  outline: none;
+  border-color: #1b5e20;
+  box-shadow: 0 0 5px rgba(46, 125, 50, 0.4);
+}
+
+.auth-btn {
+  background-color: #2e7d32;
+  color: white;
+  padding: 14px;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.auth-btn:hover {
+  background-color: #1b5e20;
+}
+
+.auth-link {
+  margin-top: 10px;
+  color: #2e7d32;
+  font-weight: bold;
+  display: inline-block;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  color: #1b5e20;
+  text-decoration: underline;
+}

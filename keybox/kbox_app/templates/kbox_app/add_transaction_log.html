@@ -1,0 +1,27 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Transaction Log</title>
+    <link rel="stylesheet" href="{% static 'kbox_app/css/style.css' %}">
+</head>
+<body>
+    <div class="container">
+        <h1>Add Transaction Log</h1>
+
+        {% if user.is_superuser %}
+            <form method="POST">
+                {% csrf_token %}
+                {{ form.as_p }}  <!-- Render the form fields here -->
+                <button type="submit">Save Log</button>
+            </form>
+        {% else %}
+            <p>You do not have permission to add logs. Only admin users can add logs.</p>
+        {% endif %}
+
+        <a href="{% url 'dashboard' %}">Back to Dashboard</a>
+    </div>
+</body>
+</html>

@@ -1,0 +1,151 @@
+{% extends "kbox_app/base.html" %}
+
+{% block content %}
+<div class="page-header">
+  <h1>{{ title }}</h1>
+  <a href="{% url 'esp32_list' %}" class="btn btn-secondary">← Back to List</a>
+</div>
+
+<div class="content-box">
+  <form method="post" style="max-width: 800px;">
+    {% csrf_token %}
+    
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <div class="form-group">
+      <label for="{{ form.device_name.id_for_label }}">
+        {{ form.device_name.label }} <span style="color: red;">*</span>
+      </label>
+      {{ form.device_name }}
+      {% if form.device_name.errors %}
+        <div style="color: #dc3545; font-size: 14px; margin-top: 5px;">
+          {{ form.device_name.errors }}
+        </div>
+      {% endif %}
+      {% if form.device_name.help_text %}
+        <small style="color: #6c757d; display: block; margin-top: 5px;">
+          {{ form.device_name.help_text }}
+        </small>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label for="{{ form.device_id.id_for_label }}">
+        {{ form.device_id.label }} <span style="color: red;">*</span>
+      </label>
+      {{ form.device_id }}
+      {% if form.device_id.errors %}
+        <div style="color: #dc3545; font-size: 14px; margin-top: 5px;">
+          {{ form.device_id.errors }}
+        </div>
+      {% endif %}
+      {% if form.device_id.help_text %}
+        <small style="color: #6c757d; display: block; margin-top: 5px;">
+          {{ form.device_id.help_text }}
+        </small>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label for="{{ form.room.id_for_label }}">
+        {{ form.room.label }}
+      </label>
+      {{ form.room }}
+      {% if form.room.errors %}
+        <div style="color: #dc3545; font-size: 14px; margin-top: 5px;">
+          {{ form.room.errors }}
+        </div>
+      {% endif %}
+      {% if form.room.help_text %}
+        <small style="color: #6c757d; display: block; margin-top: 5px;">
+          {{ form.room.help_text }}
+        </small>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label for="{{ form.firmware_version.id_for_label }}">
+        {{ form.firmware_version.label }}
+      </label>
+      {{ form.firmware_version }}
+      {% if form.firmware_version.errors %}
+        <div style="color: #dc3545; font-size: 14px; margin-top: 5px;">
+          {{ form.firmware_version.errors }}
+        </div>
+      {% endif %}
+      {% if form.firmware_version.help_text %}
+        <small style="color: #6c757d; display: block; margin-top: 5px;">
+          {{ form.firmware_version.help_text }}
+        </small>
+      {% endif %}
+    </div>
+
+    <div class="form-group">
+      <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+        {{ form.is_active }}
+        <span>{{ form.is_active.label }}</span>
+      </label>
+      {% if form.is_active.errors %}
+        <div style="color: #dc3545; font-size: 14px; margin-top: 5px;">
+          {{ form.is_active.errors }}
+        </div>
+      {% endif %}
+    </div>
+
+    <div style="margin-top: 30px; display: flex; gap: 10px;">
+      <button type="submit" class="btn btn-primary">{{ button_text }}</button>
+      <a href="{% url 'esp32_list' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<style>
+  .form-group {
+    margin-bottom: 25px;
+  }
+
+  .form-group label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #333;
+  }
+
+  .form-group input[type="text"],
+  .form-group select {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: all 0.3s;
+  }
+
+  .form-group input[type="text"]:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+
+  .form-group input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+  }
+
+  .btn-secondary {
+    background: #6c757d;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #5a6268;
+  }
+</style>
+
+{% endblock %}

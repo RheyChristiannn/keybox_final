@@ -1,0 +1,171 @@
+{% extends "kbox_app/base.html" %}
+
+{% block content %}
+<div class="page-header">
+  <h1>🗑️ Delete ESP32 Device</h1>
+  <a href="{% url 'esp32_list' %}" class="btn btn-secondary">← Back to List</a>
+</div>
+
+<div class="content-box">
+  <div style="max-width: 600px; margin: 0 auto;">
+    <!-- Warning Alert -->
+    <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+      <div style="display: flex; gap: 15px; align-items: start;">
+        <span style="font-size: 48px;">⚠️</span>
+        <div>
+          <h3 style="color: #856404; margin: 0 0 10px 0;">Warning: Permanent Deletion</h3>
+          <p style="color: #856404; margin: 0;">
+            You are about to permanently delete this ESP32 device from the system. This action cannot be undone.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Device Information -->
+    <div style="background: #f8f9fa; padding: 25px; border-radius: 8px; margin-bottom: 30px;">
+      <h3 style="margin: 0 0 20px 0; color: #333;">Device Details</h3>
+      
+      <div style="display: grid; gap: 15px;">
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
+          <strong style="color: #666;">Device Name:</strong>
+          <span style="font-weight: 600; color: #333;">{{ device.device_name }}</span>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
+          <strong style="color: #666;">Device ID:</strong>
+          <code style="background: #fff; padding: 4px 8px; border-radius: 4px; font-size: 13px;">
+            {{ device.device_id }}
+          </code>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
+          <strong style="color: #666;">Assigned Room:</strong>
+          <span style="color: #333;">
+            {% if device.room %}
+              🏫 {{ device.room.code }}
+            {% else %}
+              <span style="color: #999;">Unassigned</span>
+            {% endif %}
+          </span>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
+          <strong style="color: #666;">Status:</strong>
+          <span>
+            {% if device.is_online %}
+              <span style="color: #4caf50; font-weight: 600;">🟢 Online</span>
+            {% else %}
+              <span style="color: #f44336; font-weight: 600;">🔴 Offline</span>
+            {% endif %}
+          </span>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dee2e6;">
+          <strong style="color: #666;">Last Heartbeat:</strong>
+          <span style="color: #333;">
+            {% if device.last_heartbeat %}
+              {{ device.last_heartbeat|timesince }} ago
+            {% else %}
+              <span style="color: #999;">Never connected</span>
+            {% endif %}
+          </span>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; padding: 10px 0;">
+          <strong style="color: #666;">Firmware Version:</strong>
+          <span style="color: #333;">
+            {{ device.firmware_version|default:"Unknown" }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Consequences Warning -->
+    <div style="background: #f8d7da; border-left: 4px solid #dc3545; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+      <h4 style="color: #721c24; margin: 0 0 15px 0;">⚠️ What will happen:</h4>
+      <ul style="color: #721c24; margin: 0; padding-left: 25px; line-height: 1.8;">
+        <li>The device record will be <strong>permanently deleted</strong></li>
+        <li>This device will no longer appear in the system</li>
+        <li>Historical heartbeat data will be lost</li>
+        <li>You'll need to re-register this device if you want to use it again</li>
+        {% if device.room %}
+        <li>Room <strong>{{ device.room.code }}</strong> will no longer have this device assigned</li>
+        {% endif %}
+      </ul>
+    </div>
+
+    <!-- Confirmation Form -->
+    <form method="post" style="margin-top: 30px;">
+      {% csrf_token %}
+      
+      <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin-bottom: 25px; border-left: 4px solid #2196f3;">
+        <p style="margin: 0; color: #0d47a1; font-weight: 500;">
+          ℹ️ <strong>Alternative:</strong> Instead of deleting, you can <strong>disable</strong> the device 
+          to keep its history while preventing it from connecting.
+        </p>
+      </div>
+
+      <div style="display: flex; gap: 15px; justify-content: center;">
+        <a href="{% url 'esp32_list' %}" class="btn btn-secondary" style="min-width: 120px;">
+          ← Cancel
+        </a>
+        <button type="submit" class="btn btn-danger" style="min-width: 120px;">
+          🗑️ Delete Permanently
+        </button>
+      </div>
+    </form>
+
+    <!-- Help Text -->
+    <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 2px solid #dee2e6;">
+      <p style="color: #666; font-size: 14px; margin: 0;">
+        💡 <strong>Tip:</strong> Consider using the "Disable" option instead if you might need this device again.
+      </p>
+    </div>
+  </div>
+</div>
+
+<style>
+  .btn-danger {
+    background: #dc3545;
+    color: white;
+    transition: all 0.3s;
+  }
+
+  .btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.4);
+  }
+
+  .btn-secondary {
+    background: #6c757d;
+    color: white;
+    transition: all 0.3s;
+  }
+
+  .btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(108, 117, 125, 0.4);
+  }
+
+  code {
+    font-family: 'Courier New', monospace;
+  }
+
+  @media (max-width: 600px) {
+    .content-box > div {
+      max-width: 100% !important;
+    }
+
+    form > div:last-of-type {
+      flex-direction: column;
+    }
+
+    .btn {
+      width: 100%;
+    }
+  }
+</style>
+
+{% endblock %}

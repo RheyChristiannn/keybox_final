@@ -1,0 +1,181 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{% static 'kbox_app/css/style.css' %}">
+  <style>
+    body {
+      background-color: #2e7d32;
+    }
+    .container {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .form-header {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      margin-bottom: 25px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .form-header h1 {
+      margin: 0;
+      color: #2e7d32;
+      font-size: 26px;
+    }
+    .form-container {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+      font-size: 14px;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    .errorlist {
+      list-style: none;
+      padding: 10px;
+      background: #ffebee;
+      color: #c62828;
+      border-left: 4px solid #d32f2f;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+    .button-group {
+      margin-top: 25px;
+    }
+    .btn {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      transition: all 0.3s;
+      font-size: 15px;
+      width: 100%;
+    }
+    .btn-primary {
+      background: #388e3c;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #2e7d32;
+    }
+    .back-link {
+      display: inline-block;
+      color: white;
+      margin-bottom: 20px;
+      text-decoration: none;
+      padding: 10px 20px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 6px;
+    }
+    .back-link:hover {
+      background: rgba(255,255,255,0.3);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    
+    <a href="{% url 'faculty_list' %}" class="back-link">← Back to Faculty List</a>
+
+    <div class="form-header">
+      <h1>{{ title }}</h1>
+    </div>
+
+    <div class="form-container">
+      <form method="POST">
+        {% csrf_token %}
+
+        <!-- GLOBAL ERRORS (VERY IMPORTANT!) -->
+        {% if form.errors %}
+        <ul class="errorlist">
+          <strong>Please correct the following:</strong>
+          {% for field, errors in form.errors.items %}
+            {% for error in errors %}
+              <li>{{ field }}: {{ error }}</li>
+            {% endfor %}
+          {% endfor %}
+        </ul>
+        {% endif %}
+
+        <!-- SCHOOL ID -->
+        <div class="form-group">
+          <label for="{{ form.school_id.id_for_label }}">{{ form.school_id.label }}</label>
+          {{ form.school_id }}
+        </div>
+
+        <!-- NAME INPUTS (MANUAL FIELDS) -->
+        <div class="form-group">
+          <label>First Name</label>
+          <input type="text" name="first_name" value="{{ first_name }}" placeholder="Enter first name" required>
+        </div>
+
+        <div class="form-group">
+          <label>Middle Name (optional)</label>
+          <input type="text" name="middle_name" value="{{ middle_name }}" placeholder="Enter middle name">
+        </div>
+
+        <div class="form-group">
+          <label>Last Name</label>
+          <input type="text" name="last_name" value="{{ last_name }}" placeholder="Enter last name" required>
+        </div>
+
+        <div class="form-group">
+          <label>Extension (Jr., Sr., III - Optional)</label>
+          <input type="text" name="extension" value="{{ extension }}" placeholder="Leave blank if none">
+        </div>
+
+        <!-- DEPARTMENT -->
+        <div class="form-group">
+          <label for="{{ form.department.id_for_label }}">{{ form.department.label }}</label>
+          {{ form.department }}
+        </div>
+
+        <!-- ACTIVE STATUS -->
+        <div class="form-group">
+          <!-- hidden input forces FALSE when unchecked -->
+          <input type="hidden" name="is_active" value="false">
+
+          <label style="font-weight:600;">
+            <input type="checkbox" name="is_active" value="true"
+                   {% if form.instance.is_active %}checked{% endif %}>
+            Active Status
+          </label>
+        </div>
+
+        <div class="button-group">
+          <button type="submit" class="btn btn-primary">{{ button_text }}</button>
+        </div>
+
+      </form>
+    </div>
+
+  </div>
+</body>
+</html>
