@@ -1,0 +1,514 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <SPI.h>
+#include <MFRC522.h>
+#include <ArduinoJson.h>
+
+/*
+ * ============================================================================
+ * ESP32-S3 TO RC522 RFID MODULE WIRING DIAGRAM
+ * ============================================================================
+ * 
+ * RC522 Pin    →    ESP32-S3 Pin    →    Description
+ * ─────────────────────────────────────────────────────────────────────────
+ * SDA (SS)     →    GPIO 10          →    Slave Select (Chip Select)
+ * SCK          →    GPIO 11          →    Serial Clock
+ * MOSI         →    GPIO 12          →    Master Out Slave In
+ * MISO         →    GPIO 13          →    Master In Slave Out
+ * IRQ          →    Not Connected    →    Interrupt (not used)
+ * GND          →    GND              →    Ground
+ * RST          →    GPIO 9           →    Reset Pin
+ * 3.3V         →    3.3V             →    Power Supply (DO NOT USE 5V!)
+ * 
+ * ============================================================================
+ * RELAY MODULE WIRING (for Solenoid Lock)
+ * ============================================================================
+ * 
+ * Relay Module →    ESP32-S3 Connection
+ * ───────────────────────────────────────────────────────────
+ * VCC (Power)  →    5V pin (relay needs 5V to operate)
+ * GND          →    GND
+ * IN (Signal)  →    GPIO 4 (3.3V logic signal is sufficient)
+ * 
+ * Solenoid Lock Connection:
+ * - Connect solenoid to relay's COM (Common) and NO (Normally Open) terminals
+ * - Connect power supply (12V typically) to solenoid and relay COM
+ * 
+ * ⚠️ IMPORTANT RELAY NOTES:
+ * - Some relay modules are ACTIVE LOW (trigger with LOW signal)
+ * - Some relay modules are ACTIVE HIGH (trigger with HIGH signal)
+ * - If solenoid opens when you plug in USB, your relay is ACTIVE LOW
+ * - Change RELAY_ACTIVE_HIGH to false if this happens
+ * 
+ * ============================================================================
+ */
+
+// ---------------------------
+// WIFI SETTINGS
+// ---------------------------
+const char* WIFI_SSID = "";
+const char* WIFI_PASSWORD = "";
+
+// ---------------------------
+// DJANGO SERVER URLs
+// ---------------------------
+String serverUrl = "||";
+String manualTriggerUrl = "||";
+String heartbeatUrl = "";
+
+String room_code = "205";
+
+const char* FIRMWARE_VERSION = "v1.1.0";
+
+
+#define RELAY_PIN 4  // GPIO 4 - Connected to relay IN pin
+#define RELAY_ACTIVE_HIGH false  
+
+#define RELAY_ON  (RELAY_ACTIVE_HIGH ? HIGH : LOW)
+#define RELAY_OFF (RELAY_ACTIVE_HIGH ? LOW : HIGH)
+
+#define SS_PIN    10   // SDA/SS  → GPIO 10
+#define RST_PIN    9   // RST     → GPIO 9
+// SPI Pins (defined in SPI.begin):
+// SCK  → GPIO 11
+// MOSI → GPIO 12
+// MISO → GPIO 13
+
+MFRC522 rfid(SS_PIN, RST_PIN);
+
+const unsigned long SOLENOID_UNLOCK_TIME = 10000; // 10 seconds unlock time (for RFID only)
+const unsigned long MANUAL_CHECK_INTERVAL = 2000; // Check for manual triggers every 2 seconds
+const unsigned long RFID_SCAN_INTERVAL = 100;     // RFID scan interval
+const unsigned long HEARTBEAT_INTERVAL = 30000;   // Send heartbeat every 30 seconds
+
+// ---------------------------
+// STATE MANAGEMENT
+// ---------------------------
+unsigned long lastManualCheckTime = 0;
+unsigned long lastRfidScanTime = 0;
+unsigned long lastHeartbeatTime = 0;
+bool doorCurrentlyUnlocked = false;
+unsigned long doorUnlockStartTime = 0;
+bool manualControlActive = false;  // NEW: Track if manual control is active
+String deviceID = "";  // Will store MAC address
+
+// ---------------------------
+// HELPER FUNCTIONS
+// ---------------------------
+
+// Convert RFID UID to readable hex string
+String uidToString(MFRC522::Uid *uid) {
+  String result = "";
+  for (byte i = 0; i < uid->size; i++) {
+    if (uid->uidByte[i] < 0x10) result += "0";
+    result += String(uid->uidByte[i], HEX);
+  }
+  result.toUpperCase();
+  return result;
+}
+
+// Activate relay to unlock solenoid (RFID triggered - with timer)
+void unlockDoorWithTimer() {
+  Serial.println("🔓 UNLOCKING DOOR (Auto-lock in 10 seconds)...");
+  digitalWrite(RELAY_PIN, RELAY_ON);   // Activate relay → solenoid UNLOCKED
+  doorCurrentlyUnlocked = true;
+  doorUnlockStartTime = millis();
+  manualControlActive = false;  // Disable manual control mode
+}
+
+// Unlock door via manual control (no auto-lock)
+void unlockDoorManual() {
+  Serial.println("🔓 UNLOCKING DOOR (Manual Control - No Auto-lock)...");
+  digitalWrite(RELAY_PIN, RELAY_ON);   // Activate relay → solenoid UNLOCKED
+  doorCurrentlyUnlocked = true;
+  manualControlActive = true;  // Enable manual control mode
+}
+
+// Lock the door
+void lockDoor() {
+  digitalWrite(RELAY_PIN, RELAY_OFF);  // Deactivate relay → solenoid LOCKED
+  doorCurrentlyUnlocked = false;
+  manualControlActive = false;  // Disable manual control mode
+  Serial.println("🔒 DOOR LOCKED");
+}
+
+// Check if unlock time has expired (only for RFID-triggered unlocks)
+void checkDoorTimer() {
+  if (doorCurrentlyUnlocked && !manualControlActive) {
+    if (millis() - doorUnlockStartTime >= SOLENOID_UNLOCK_TIME) {
+      lockDoor();
+      Serial.println("⏰ Auto-lock timer expired (RFID mode)");
+    }
+  }
+}
+
+// Send heartbeat to Django server
+void sendHeartbeat() {
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  HTTPClient http;
+  http.begin(heartbeatUrl);
+  http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+  
+  String postData = "device_id=" + deviceID + "&firmware_version=" + String(FIRMWARE_VERSION);
+  
+  int httpCode = http.POST(postData);
+  
+  if (httpCode == 200) {
+    Serial.println("💓 Heartbeat sent successfully");
+    Serial.print("   Device ID: ");
+    Serial.println(deviceID);
+    Serial.print("   Firmware: ");
+    Serial.println(FIRMWARE_VERSION);
+  } else if (httpCode > 0) {
+    Serial.print("⚠️ Heartbeat failed: HTTP ");
+    Serial.println(httpCode);
+  }
+  
+  http.end();
+}
+
+// Check for manual trigger commands from Django
+void checkManualTrigger() {
+  if (WiFi.status() != WL_CONNECTED) {
+    return;
+  }
+
+  HTTPClient http;
+  String url = manualTriggerUrl + "?room=" + room_code;
+  
+  http.begin(url);
+  http.setTimeout(5000);  // 5 second timeout for manual checks
+  int httpCode = http.GET();
+
+  if (httpCode == 200) {
+    String response = http.getString();
+    
+    // Parse JSON response
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, response);
+
+    if (!error) {
+      const char* action = doc["action"];
+      bool has_trigger = doc["has_trigger"] | false;
+      
+      if (has_trigger && action) {
+        Serial.println("\n╔═══════════════════════════════════════════╗");
+        Serial.println("║     🖱️  MANUAL TRIGGER RECEIVED          ║");
+        Serial.println("╚═══════════════════════════════════════════╝");
+        Serial.print("  Action: ");
+        Serial.println(action);
+        Serial.print("  Room: ");
+        Serial.println(room_code);
+        Serial.println("  Mode: Manual Control (No Auto-lock)");
+        
+        if (String(action) == "open") {
+          unlockDoorManual();  // UPDATED: Use manual unlock (no timer)
+        } else if (String(action) == "close") {
+          lockDoor();  // UPDATED: Lock immediately, no timer
+        }
+        
+        Serial.println("═══════════════════════════════════════════\n");
+      }
+    }
+  } else if (httpCode > 0 && httpCode != 404) {
+    Serial.print("⚠️ Manual trigger check failed: HTTP ");
+    Serial.println(httpCode);
+  }
+
+  http.end();
+}
+
+// ---------------------------------------------------------
+// SETUP - Runs once at startup
+// ---------------------------------------------------------
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  Serial.println("\n╔═══════════════════════════════════════════╗");
+  Serial.print("║   ESP32-S3 RFID Keybox System ");
+  Serial.print(FIRMWARE_VERSION);
+  Serial.println("      ║");
+  Serial.println("║   WITH MANUAL CONTROL SUPPORT             ║");
+  Serial.println("╚═══════════════════════════════════════════╝\n");
+
+  // ── STEP 1: Initialize Relay Pin ──
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, RELAY_OFF);  // Ensure door stays LOCKED at boot
+  
+  Serial.println("✓ Relay Module Initialized");
+  Serial.print("  → Pin: GPIO ");
+  Serial.println(RELAY_PIN);
+  Serial.print("  → Type: ");
+  Serial.println(RELAY_ACTIVE_HIGH ? "ACTIVE HIGH" : "ACTIVE LOW");
+  Serial.print("  → Boot State: ");
+  Serial.println(digitalRead(RELAY_PIN) == HIGH ? "HIGH (locked)" : "LOW (locked)");
+
+  // ── STEP 2: Connect to WiFi ──
+  Serial.println("\n✓ Connecting to WiFi...");
+  Serial.print("  → SSID: ");
+  Serial.println(WIFI_SSID);
+
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  int wifi_retry = 0;
+  while (WiFi.status() != WL_CONNECTED && wifi_retry < 20) {
+    delay(500);
+    Serial.print(".");
+    wifi_retry++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✓ WiFi Connected!");
+    Serial.print("  → IP Address: ");
+    Serial.println(WiFi.localIP());
+    Serial.print("  → Signal Strength: ");
+    Serial.print(WiFi.RSSI());
+    Serial.println(" dBm");
+    
+    // Get MAC address as device ID
+    deviceID = WiFi.macAddress();
+    deviceID.replace(":", "");  // Remove colons
+    Serial.print("  → Device ID (MAC): ");
+    Serial.println(deviceID);
+  } else {
+    Serial.println("\n✗ WiFi Connection Failed!");
+    Serial.println("  → Check SSID and password");
+  }
+
+  // ── STEP 3: Initialize SPI and RFID Reader ──
+  Serial.println("\n✓ Initializing RFID Reader...");
+  
+  // SPI Pin Configuration: SCK, MISO, MOSI, SS
+  SPI.begin(11, 13, 12, 10);
+  Serial.println("  → SPI Pins: SCK=11, MISO=13, MOSI=12, SS=10");
+  
+  rfid.PCD_Init();
+  delay(100);
+  
+  // Check if RFID reader is detected
+  byte version = rfid.PCD_ReadRegister(rfid.VersionReg);
+  if (version == 0x00 || version == 0xFF) {
+    Serial.println("✗ RFID Reader Not Detected!");
+    Serial.println("  → Check wiring connections");
+  } else {
+    Serial.println("✓ RFID Reader Ready");
+    Serial.print("  → Firmware Version: 0x");
+    Serial.println(version, HEX);
+    Serial.print("  → SS Pin: GPIO ");
+    Serial.println(SS_PIN);
+    Serial.print("  → RST Pin: GPIO ");
+    Serial.println(RST_PIN);
+  }
+
+  // ── STEP 4: System Ready ──
+  Serial.println("\n✓ Server Configuration");
+  Serial.print("  → RFID URL: ");
+  Serial.println(serverUrl);
+  Serial.print("  → Manual Trigger URL: ");
+  Serial.println(manualTriggerUrl);
+  Serial.print("  → Heartbeat URL: ");
+  Serial.println(heartbeatUrl);
+  Serial.print("  → Room Code: ");
+  Serial.println(room_code);
+  Serial.print("  → Firmware Version: ");
+  Serial.println(FIRMWARE_VERSION);
+  Serial.print("  → Manual Check Interval: ");
+  Serial.print(MANUAL_CHECK_INTERVAL);
+  Serial.println(" ms");
+  Serial.print("  → Heartbeat Interval: ");
+  Serial.print(HEARTBEAT_INTERVAL / 1000);
+  Serial.println(" seconds");
+  Serial.print("  → RFID Auto-lock Timer: ");
+  Serial.print(SOLENOID_UNLOCK_TIME / 1000);
+  Serial.println(" seconds");
+
+  Serial.println("\n╔═══════════════════════════════════════════╗");
+  Serial.println("║  System Ready - Waiting for commands     ║");
+  Serial.println("║  • RFID: Auto-locks after 10 seconds      ║");
+  Serial.println("║  • Manual: Direct control (no auto-lock)  ║");
+  Serial.println("║  • Heartbeat transmission                 ║");
+  Serial.println("╚═══════════════════════════════════════════╝\n");
+  
+  // Send initial heartbeat
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("→ Sending initial heartbeat...");
+    sendHeartbeat();
+  }
+}
+
+// ---------------------------------------------------------
+// MAIN LOOP - Runs continuously (NON-BLOCKING)
+// ---------------------------------------------------------
+void loop() {
+  unsigned long currentMillis = millis();
+
+  // Always check if door unlock timer has expired (only for RFID mode)
+  checkDoorTimer();
+
+  // ═══════════════════════════════════════════════════════
+  // TASK 1: Check for manual triggers periodically
+  // ═══════════════════════════════════════════════════════
+  if (currentMillis - lastManualCheckTime >= MANUAL_CHECK_INTERVAL) {
+    lastManualCheckTime = currentMillis;
+    checkManualTrigger();
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TASK 2: Send heartbeat to server periodically
+  // ═══════════════════════════════════════════════════════
+  if (currentMillis - lastHeartbeatTime >= HEARTBEAT_INTERVAL) {
+    lastHeartbeatTime = currentMillis;
+    sendHeartbeat();
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // TASK 3: Check for RFID cards
+  // ═══════════════════════════════════════════════════════
+  if (currentMillis - lastRfidScanTime >= RFID_SCAN_INTERVAL) {
+    lastRfidScanTime = currentMillis;
+    
+    // Check if new RFID card is present
+    if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+      
+      // Convert UID to hex string
+      String uid = uidToString(&rfid.uid);
+
+      Serial.println("\n┌───────────────────────────────────────────┐");
+      Serial.println("│       📱 RFID CARD DETECTED               │");
+      Serial.println("└───────────────────────────────────────────┘");
+      Serial.print("  UID: ");
+      Serial.println(uid);
+      Serial.print("  Room: ");
+      Serial.println(room_code);
+
+      // Send request to Django API
+      if (WiFi.status() == WL_CONNECTED) {
+
+        HTTPClient http;
+        String url = serverUrl + "?code=" + uid + "&room=" + room_code;
+        
+        Serial.println("\n→ Sending request to Django server...");
+        Serial.print("  URL: ");
+        Serial.println(url);
+
+        http.begin(url);
+        http.setTimeout(10000);  // 10 second timeout
+        int httpCode = http.GET();
+
+        if (httpCode > 0) {
+          Serial.print("✓ HTTP Response Code: ");
+          Serial.println(httpCode);
+
+          String response = http.getString();
+          Serial.println("\n┌─── Server Response ───────────────────────┐");
+          Serial.println(response);
+          Serial.println("└───────────────────────────────────────────┘");
+
+          // Parse JSON response
+          if (httpCode == 200) {
+            StaticJsonDocument<1024> doc;
+            DeserializationError error = deserializeJson(doc, response);
+
+            if (!error) {
+              // Extract fields from Django response
+              const char* status = doc["status"];
+              bool access_granted = doc["access_granted"] | false;
+              const char* action = doc["action"];
+              const char* faculty = doc["faculty"];
+              const char* message = doc["message"];
+              const char* denial_reason = doc["denial_reason"];
+
+              Serial.println("\n┌─── Parsed Data ───────────────────────────┐");
+              Serial.print("│ Status: ");
+              Serial.println(status);
+              Serial.print("│ Access Granted: ");
+              Serial.println(access_granted ? "YES ✓" : "NO ✗");
+              Serial.print("│ Action: ");
+              Serial.println(action);
+              Serial.print("│ Faculty: ");
+              Serial.println(faculty);
+              Serial.print("│ Message: ");
+              Serial.println(message);
+
+              if (denial_reason && strlen(denial_reason) > 0) {
+                Serial.print("│ Denial Reason: ");
+                Serial.println(denial_reason);
+              }
+              Serial.println("└───────────────────────────────────────────┘");
+
+              // Check if access is granted and handle action
+              if (access_granted && (String(status) == "ok")) {
+                Serial.println("\n✅ ACCESS GRANTED!");
+                Serial.print("   Faculty: ");
+                Serial.println(faculty);
+                Serial.print("   Action: ");
+                Serial.println(action);
+                
+                // Handle both borrow_key and return_key with 10-second timer
+                if (String(action) == "borrow_key") {
+                  Serial.println("   → Faculty borrowing key (auto-lock in 10s)");
+                  unlockDoorWithTimer();  // UPDATED: Use timer version
+                } else if (String(action) == "return_key") {
+                  Serial.println("   → Faculty returning key (auto-lock in 10s)");
+                  unlockDoorWithTimer();  // UPDATED: Use timer version
+                }
+                
+              } else {
+                Serial.println("\n❌ ACCESS DENIED!");
+                if (denial_reason && strlen(denial_reason) > 0) {
+                  Serial.print("   Reason: ");
+                  Serial.println(denial_reason);
+                } else {
+                  Serial.print("   Reason: ");
+                  Serial.println(message);
+                }
+              }
+
+            } else {
+              Serial.println("\n⚠️ JSON Parse Error:");
+              Serial.print("   ");
+              Serial.println(error.c_str());
+              Serial.println("   Door stays locked for safety.");
+            }
+
+          } else if (httpCode == 404) {
+            Serial.println("\n❌ RFID CARD NOT REGISTERED");
+            Serial.println("   This card is not in the database.");
+            Serial.println("   Please register the card first.");
+            
+          } else {
+            Serial.println("\n❌ Unexpected HTTP Response Code");
+            Serial.print("   Expected 200, got ");
+            Serial.println(httpCode);
+          }
+
+        } else {
+          Serial.print("\n✗ HTTP Request Failed: ");
+          Serial.println(http.errorToString(httpCode).c_str());
+          Serial.println("   Check if Django server is running.");
+        }
+
+        http.end();
+
+      } else {
+        Serial.println("\n✗ WiFi Disconnected!");
+        Serial.println("   Attempting to reconnect...");
+        WiFi.reconnect();
+      }
+
+      // Stop RFID reading until next card
+      rfid.PICC_HaltA();
+      rfid.PCD_StopCrypto1();
+
+      Serial.println("\n═══════════════════════════════════════════");
+      Serial.println("Ready for next card...\n");
+    }
+  }
+
+  // Small delay to prevent overwhelming the CPU
+  delay(10);
+}
